@@ -14,7 +14,6 @@ import {
 } from "../config/parameterRegistry";
 
 import GradientDescentControls from "./GradientDescentControls";
-
 import ParameterExplanation from "./ParameterExplanation";
 
 import RegressionAnimation, {
@@ -23,26 +22,22 @@ import RegressionAnimation, {
 
 import LossCurve from "./LossCurve";
 import LossSurface from "./LossSurface";
+
 import GradientDescentTypes, {
   type GradientDescentType,
 } from "./GradientDescentTypes";
+
 import GradientDescentComparison from "./GradientDescentComparison";
 import GradientDirectionExplanation from "./GradientDirectionExplanation";
+import GradientDescentDatasetAnalyzer from "./GradientDescentDatasetAnalyzer";
+
 /*
 ========================================================
-DATASET
-
-For our first visualization we use a small,
-easy-to-understand linear dataset.
-
-Later this can be replaced by:
-- generated datasets
-- uploaded datasets
-- notebook datasets
+DEMO DATASET
 ========================================================
 */
 
-const DATA: RegressionPoint[] = [
+const DEMO_DATA: RegressionPoint[] = [
   { x: 1, y: 2.3 },
   { x: 2, y: 4.2 },
   { x: 3, y: 5.7 },
@@ -86,24 +81,23 @@ INITIAL VALUES
 ========================================================
 */
 
-const INITIAL_VALUES: ParameterValues =
-  {
-    learningRate: 0.01,
+const INITIAL_VALUES: ParameterValues = {
+  learningRate: 0.01,
 
-    iterations: 100,
+  iterations: 100,
 
-    initialWeight: 0,
+  initialWeight: 0,
 
-    initialBias: 0,
+  initialBias: 0,
 
-    batchSize: 8,
+  batchSize: 8,
 
-    gradientType:
-      "Batch Gradient Descent",
+  gradientType:
+    "Batch Gradient Descent",
 
-    lossFunction:
-      "Mean Squared Error",
-  };
+  lossFunction:
+    "Mean Squared Error",
+};
 
 /*
 ========================================================
@@ -112,6 +106,40 @@ MAIN COMPONENT
 */
 
 export default function GradientDescentVisualizer() {
+  /*
+  --------------------------------------------------------
+  DATASET STATE
+  --------------------------------------------------------
+  */
+
+  const [
+    uploadedDataset,
+    setUploadedDataset,
+  ] = useState<
+    RegressionPoint[] | null
+  >(null);
+
+  const [
+    featureName,
+    setFeatureName,
+  ] = useState("X");
+
+  const [
+    targetName,
+    setTargetName,
+  ] = useState("Y");
+
+  /*
+  If the student has uploaded a valid dataset,
+  use it.
+
+  Otherwise use the original demo dataset.
+  */
+
+  const data =
+    uploadedDataset ??
+    DEMO_DATA;
+
   /*
   --------------------------------------------------------
   LEARNING LEVEL
@@ -222,7 +250,7 @@ export default function GradientDescentVisualizer() {
 
   /*
   --------------------------------------------------------
-  VALUES
+  CURRENT PARAMETER VALUES
   --------------------------------------------------------
   */
 
@@ -278,12 +306,13 @@ export default function GradientDescentVisualizer() {
     useMemo(
       () =>
         calculateLoss(
-          DATA,
+          data,
           weight,
           bias,
           lossFunction
         ),
       [
+        data,
         weight,
         bias,
         lossFunction,
@@ -300,7 +329,7 @@ export default function GradientDescentVisualizer() {
     useMemo(() => {
       const initialLoss =
         calculateLoss(
-          DATA,
+          data,
           initialWeight,
           initialBias,
           lossFunction
@@ -308,12 +337,14 @@ export default function GradientDescentVisualizer() {
 
       return [
         initialLoss,
+
         ...history.map(
           (snapshot) =>
             snapshot.loss
         ),
       ];
     }, [
+      data,
       history,
       initialWeight,
       initialBias,
@@ -336,20 +367,16 @@ export default function GradientDescentVisualizer() {
         gradientType ===
         "Batch Gradient Descent"
       ) {
-        return DATA.map(
-          (_, index) => index
+        return data.map(
+          (_, index) =>
+            index
         );
       }
 
       /*
       Stochastic Gradient Descent
 
-      Cycle through one sample
-      at a time instead of using
-      random selection.
-
-      This makes the visualization
-      reproducible for students.
+      Use one sample per update.
       */
 
       if (
@@ -358,15 +385,12 @@ export default function GradientDescentVisualizer() {
       ) {
         return [
           iteration %
-            DATA.length,
+            data.length,
         ];
       }
 
       /*
       Mini-Batch Gradient Descent
-
-      Cycle through consecutive
-      mini-batches.
       */
 
       const safeBatchSize =
@@ -375,13 +399,13 @@ export default function GradientDescentVisualizer() {
             1,
             batchSize
           ),
-          DATA.length
+          data.length
         );
 
       const start =
         (iteration *
           safeBatchSize) %
-        DATA.length;
+        data.length;
 
       const indexes: number[] =
         [];
@@ -393,12 +417,13 @@ export default function GradientDescentVisualizer() {
       ) {
         indexes.push(
           (start + i) %
-            DATA.length
+            data.length
         );
       }
 
       return indexes;
     }, [
+      data,
       gradientType,
       iteration,
       batchSize,
@@ -421,13 +446,21 @@ export default function GradientDescentVisualizer() {
         return;
       }
 
+      if (
+        data.length === 0
+      ) {
+        setIsPlaying(false);
+
+        return;
+      }
+
       const indexes =
         chooseActiveIndexes();
 
       const selectedData =
         indexes.map(
           (index) =>
-            DATA[index]
+            data[index]
         );
 
       const gradients =
@@ -449,31 +482,31 @@ export default function GradientDescentVisualizer() {
           gradients.biasGradient;
 
       /*
-      We calculate displayed loss
-      using the COMPLETE dataset.
-
-      This makes Batch, SGD and
-      Mini-Batch easier to compare.
+      Displayed loss is calculated
+      using the complete active dataset.
       */
 
       const newLoss =
         calculateLoss(
-          DATA,
+          data,
           newWeight,
           newBias,
           lossFunction
         );
 
-      const snapshot: TrainingSnapshot =
-        {
+      const snapshot:
+        TrainingSnapshot = {
           iteration:
             iteration + 1,
 
-          weight: newWeight,
+          weight:
+            newWeight,
 
-          bias: newBias,
+          bias:
+            newBias,
 
-          loss: newLoss,
+          loss:
+            newLoss,
 
           weightGradient:
             gradients.weightGradient,
@@ -509,6 +542,7 @@ export default function GradientDescentVisualizer() {
         ]
       );
     }, [
+      data,
       iteration,
       maxIterations,
       chooseActiveIndexes,
@@ -567,7 +601,7 @@ export default function GradientDescentVisualizer() {
 
   /*
   ========================================================
-  RESET
+  RESET TRAINING
   ========================================================
   */
 
@@ -681,11 +715,8 @@ export default function GradientDescentVisualizer() {
     );
 
     /*
-    Starting weight/bias change
+    Starting weight/bias changes
     where optimization begins.
-
-    Reset immediately so the
-    student can see the effect.
     */
 
     if (
@@ -769,7 +800,7 @@ export default function GradientDescentVisualizer() {
 
   /*
   ========================================================
-  CHANGE GD TYPE
+  CHANGE GRADIENT DESCENT TYPE
   ========================================================
   */
 
@@ -791,9 +822,7 @@ export default function GradientDescentVisualizer() {
 
     setIsPlaying(false);
 
-    setActiveIndexes(
-      []
-    );
+    setActiveIndexes([]);
 
     setIteration(0);
 
@@ -810,133 +839,220 @@ export default function GradientDescentVisualizer() {
 
   /*
   ========================================================
+  USE UPLOADED DATASET
+  ========================================================
+  */
+
+  function useUploadedDataset(
+    nextData: RegressionPoint[],
+    nextFeatureName: string,
+    nextTargetName: string
+  ) {
+    setIsPlaying(false);
+
+    setUploadedDataset(
+      nextData
+    );
+
+    setFeatureName(
+      nextFeatureName
+    );
+
+    setTargetName(
+      nextTargetName
+    );
+
+    /*
+    Start the new dataset from the
+    configured initial parameters.
+    */
+
+    setWeight(
+      initialWeight
+    );
+
+    setBias(
+      initialBias
+    );
+
+    setIteration(0);
+
+    setHistory([]);
+
+    setActiveIndexes([]);
+  }
+
+  /*
+  ========================================================
+  RETURN TO DEMO DATASET
+  ========================================================
+  */
+
+  function useDemoDataset() {
+    setIsPlaying(false);
+
+    setUploadedDataset(null);
+
+    setFeatureName("X");
+
+    setTargetName("Y");
+
+    setWeight(
+      initialWeight
+    );
+
+    setBias(
+      initialBias
+    );
+
+    setIteration(0);
+
+    setHistory([]);
+
+    setActiveIndexes([]);
+  }
+
+  /*
+  ========================================================
+  OPTIMIZATION PATH FOR LOSS SURFACE
+  ========================================================
+  */
+
+  const optimizationHistory =
+    useMemo(
+      () => [
+        {
+          weight:
+            initialWeight,
+
+          bias:
+            initialBias,
+
+          loss:
+            calculateLoss(
+              data,
+              initialWeight,
+              initialBias,
+              lossFunction
+            ),
+        },
+
+        ...history.map(
+          (snapshot) => ({
+            weight:
+              snapshot.weight,
+
+            bias:
+              snapshot.bias,
+
+            loss:
+              snapshot.loss,
+          })
+        ),
+      ],
+      [
+        data,
+        history,
+        initialWeight,
+        initialBias,
+        lossFunction,
+      ]
+    );
+
+  /*
+  ========================================================
   CURRENT GRADIENT
   ========================================================
   */
-  /*
-========================================================
-OPTIMIZATION PATH FOR LOSS SURFACE
-========================================================
-*/
-
-const optimizationHistory =
-  useMemo(
-    () => [
-      {
-        weight:
-          initialWeight,
-
-        bias:
-          initialBias,
-
-        loss:
-          calculateLoss(
-            DATA,
-            initialWeight,
-            initialBias,
-            lossFunction
-          ),
-      },
-
-      ...history.map(
-        (snapshot) => ({
-          weight:
-            snapshot.weight,
-
-          bias:
-            snapshot.bias,
-
-          loss:
-            snapshot.loss,
-        })
-      ),
-    ],
-    [
-      history,
-      initialWeight,
-      initialBias,
-      lossFunction,
-    ]
-  );
 
   const currentGradientData =
-  useMemo(() => {
-    /*
-    Decide which samples should be used
-    when explaining the current gradient.
-    */
+    useMemo(() => {
+      if (
+        data.length === 0
+      ) {
+        return {
+          weightGradient: 0,
+          biasGradient: 0,
+        };
+      }
 
-    let indexes: number[] = [];
+      let indexes:
+        number[] = [];
 
-    if (
-      gradientType ===
-      "Batch Gradient Descent"
-    ) {
-      indexes = DATA.map(
-        (_, index) => index
-      );
-    } else if (
-      gradientType ===
-      "Stochastic Gradient Descent"
-    ) {
-      indexes = [
-        iteration %
-          DATA.length,
-      ];
-    } else {
-      const safeBatchSize =
-        Math.min(
-          Math.max(
-            1,
-            batchSize
-          ),
-          DATA.length
+      if (
+        gradientType ===
+        "Batch Gradient Descent"
+      ) {
+        indexes =
+          data.map(
+            (_, index) =>
+              index
+          );
+      } else if (
+        gradientType ===
+        "Stochastic Gradient Descent"
+      ) {
+        indexes = [
+          iteration %
+            data.length,
+        ];
+      } else {
+        const safeBatchSize =
+          Math.min(
+            Math.max(
+              1,
+              batchSize
+            ),
+            data.length
+          );
+
+        const start =
+          (iteration *
+            safeBatchSize) %
+          data.length;
+
+        indexes =
+          Array.from(
+            {
+              length:
+                safeBatchSize,
+            },
+            (_, index) =>
+              (start +
+                index) %
+              data.length
+          );
+      }
+
+      const selectedData =
+        indexes.map(
+          (index) =>
+            data[index]
         );
 
-      const start =
-        (iteration *
-          safeBatchSize) %
-        DATA.length;
-
-      indexes = Array.from(
-        {
-          length:
-            safeBatchSize,
-        },
-        (_, index) =>
-          (start + index) %
-          DATA.length
+      return calculateGradient(
+        selectedData,
+        weight,
+        bias,
+        lossFunction
       );
-    }
-
-    const selectedData =
-      indexes.map(
-        (index) =>
-          DATA[index]
-      );
-
-    return calculateGradient(
-      selectedData,
+    }, [
+      data,
+      gradientType,
+      iteration,
+      batchSize,
       weight,
       bias,
-      lossFunction
-    );
-  }, [
-    gradientType,
-    iteration,
-    batchSize,
-    weight,
-    bias,
-    lossFunction,
-  ]);
+      lossFunction,
+    ]);
 
-const currentWeightGradient =
-  currentGradientData
-    .weightGradient;
+  const currentWeightGradient =
+    currentGradientData
+      .weightGradient;
 
-const currentBiasGradient =
-  currentGradientData
-    .biasGradient;
+  const currentBiasGradient =
+    currentGradientData
+      .biasGradient;
 
   /*
   ========================================================
@@ -964,8 +1080,71 @@ const currentBiasGradient =
           Change parameters,
           inspect gradients and
           watch weight, bias and
-          loss update step by
-          step.
+          loss update step by step.
+        </p>
+      </div>
+
+      {/* DATASET ANALYZER */}
+
+      <GradientDescentDatasetAnalyzer
+        onUseDataset={
+          useUploadedDataset
+        }
+        onUseDemo={
+          useDemoDataset
+        }
+        activeFeatureName={
+          featureName
+        }
+        activeTargetName={
+          targetName
+        }
+        activeSampleCount={
+          data.length
+        }
+        usingUploadedDataset={
+          uploadedDataset !== null
+        }
+      />
+
+      {/* ACTIVE DATASET */}
+
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+          Active Training Data
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <DatasetMetric
+            label="Feature X"
+            value={featureName}
+          />
+
+          <DatasetMetric
+            label="Target Y"
+            value={targetName}
+          />
+
+          <DatasetMetric
+            label="Samples"
+            value={String(
+              data.length
+            )}
+          />
+        </div>
+
+        <p className="mt-4 text-sm leading-6 text-zinc-400">
+          Gradient Descent is
+          currently optimizing the
+          model using{" "}
+          <strong className="text-zinc-200">
+            {featureName}
+          </strong>{" "}
+          as X and{" "}
+          <strong className="text-zinc-200">
+            {targetName}
+          </strong>{" "}
+          as Y.
         </p>
       </div>
 
@@ -982,7 +1161,9 @@ const currentBiasGradient =
           onParameterChange={
             setSelectedParameterId
           }
-          values={values}
+          values={
+            values
+          }
           onValueChange={
             handleValueChange
           }
@@ -1007,21 +1188,27 @@ const currentBiasGradient =
           </div>
         )}
       </div>
-      {/* GRADIENT DIRECTION EXPLANATION */}
 
-<GradientDirectionExplanation
-  weightGradient={
-    currentWeightGradient
-  }
-  biasGradient={
-    currentBiasGradient
-  }
-  learningRate={
-    learningRate
-  }
-  weight={weight}
-  bias={bias}
-/>
+      {/* GRADIENT DIRECTION */}
+
+      <GradientDirectionExplanation
+        weightGradient={
+          currentWeightGradient
+        }
+        biasGradient={
+          currentBiasGradient
+        }
+        learningRate={
+          learningRate
+        }
+        weight={
+          weight
+        }
+        bias={
+          bias
+        }
+      />
+
       {/* ANIMATION CONTROLS */}
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
@@ -1183,9 +1370,15 @@ const currentBiasGradient =
       {/* MODEL ANIMATION */}
 
       <RegressionAnimation
-        data={DATA}
-        weight={weight}
-        bias={bias}
+        data={
+          data
+        }
+        weight={
+          weight
+        }
+        bias={
+          bias
+        }
         activeIndexes={
           activeIndexes
         }
@@ -1193,33 +1386,39 @@ const currentBiasGradient =
 
       {/* LOSS CURVE */}
 
-<LossCurve
-  lossHistory={
-    lossHistory
-  }
-  currentIteration={
-    iteration
-  }
-  maxIterations={
-    maxIterations
-  }
-/>
+      <LossCurve
+        lossHistory={
+          lossHistory
+        }
+        currentIteration={
+          iteration
+        }
+        maxIterations={
+          maxIterations
+        }
+      />
 
-{/* LOSS SURFACE */}
+      {/* LOSS SURFACE */}
 
-<LossSurface
-  data={DATA}
-  weight={weight}
-  bias={bias}
-  history={
-    optimizationHistory
-  }
-  lossFunction={
-    lossFunction
-  }
-/>
+      <LossSurface
+        data={
+          data
+        }
+        weight={
+          weight
+        }
+        bias={
+          bias
+        }
+        history={
+          optimizationHistory
+        }
+        lossFunction={
+          lossFunction
+        }
+      />
 
-{/* GRADIENT DESCENT TYPES */}
+      {/* GRADIENT DESCENT TYPES */}
 
       <GradientDescentTypes
         selectedType={
@@ -1229,7 +1428,7 @@ const currentBiasGradient =
           handleTypeChange
         }
         totalSamples={
-          DATA.length
+          data.length
         }
         batchSize={
           batchSize
@@ -1294,9 +1493,11 @@ const currentBiasGradient =
           <p className="text-sm leading-7 text-zinc-400">
             The current learning
             rate is{" "}
+
             <strong className="text-zinc-200">
               {learningRate}
             </strong>
+
             . Gradient Descent
             calculates the
             direction in which
@@ -1308,31 +1509,32 @@ const currentBiasGradient =
           </p>
         </div>
       </div>
-      {/* =====================================================
-    GRADIENT DESCENT METHOD COMPARISON
-===================================================== */}
 
-<GradientDescentComparison
-  data={DATA}
-  learningRate={
-    learningRate
-  }
-  maxIterations={
-    maxIterations
-  }
-  initialWeight={
-    initialWeight
-  }
-  initialBias={
-    initialBias
-  }
-  batchSize={
-    batchSize
-  }
-  lossFunction={
-    lossFunction
-  }
-/>
+      {/* METHOD COMPARISON */}
+
+      <GradientDescentComparison
+        data={
+          data
+        }
+        learningRate={
+          learningRate
+        }
+        maxIterations={
+          maxIterations
+        }
+        initialWeight={
+          initialWeight
+        }
+        initialBias={
+          initialBias
+        }
+        batchSize={
+          batchSize
+        }
+        lossFunction={
+          lossFunction
+        }
+      />
     </div>
   );
 }
@@ -1357,9 +1559,12 @@ function calculateLoss(
 
   let total = 0;
 
-  for (const point of data) {
+  for (
+    const point of data
+  ) {
     const prediction =
-      weight * point.x +
+      weight *
+        point.x +
       bias;
 
     const error =
@@ -1371,10 +1576,13 @@ function calculateLoss(
       "Mean Absolute Error"
     ) {
       total +=
-        Math.abs(error);
+        Math.abs(
+          error
+        );
     } else {
       total +=
-        error * error;
+        error *
+        error;
     }
   }
 
@@ -1405,9 +1613,11 @@ function calculateGradient(
     };
   }
 
-  let weightGradient = 0;
+  let weightGradient =
+    0;
 
-  let biasGradient = 0;
+  let biasGradient =
+    0;
 
   /*
   --------------------------------------------------------
@@ -1419,7 +1629,9 @@ function calculateGradient(
     lossFunction ===
     "Mean Absolute Error"
   ) {
-    for (const point of data) {
+    for (
+      const point of data
+    ) {
       const prediction =
         weight *
           point.x +
@@ -1437,7 +1649,8 @@ function calculateGradient(
             : 0;
 
       weightGradient +=
-        sign * point.x;
+        sign *
+        point.x;
 
       biasGradient +=
         sign;
@@ -1460,9 +1673,12 @@ function calculateGradient(
   --------------------------------------------------------
   */
 
-  for (const point of data) {
+  for (
+    const point of data
+  ) {
     const prediction =
-      weight * point.x +
+      weight *
+        point.x +
       bias;
 
     const error =
@@ -1470,7 +1686,8 @@ function calculateGradient(
       point.y;
 
     weightGradient +=
-      error * point.x;
+      error *
+      point.x;
 
     biasGradient +=
       error;
@@ -1478,11 +1695,13 @@ function calculateGradient(
 
   return {
     weightGradient:
-      (2 / data.length) *
+      (2 /
+        data.length) *
       weightGradient,
 
     biasGradient:
-      (2 / data.length) *
+      (2 /
+        data.length) *
       biasGradient,
   };
 }
@@ -1507,6 +1726,32 @@ function Metric({
       </p>
 
       <p className="mt-2 break-all font-mono text-sm font-semibold text-zinc-100">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+/*
+========================================================
+DATASET METRIC CARD
+========================================================
+*/
+
+function DatasetMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+      <p className="text-xs text-zinc-500">
+        {label}
+      </p>
+
+      <p className="mt-2 break-words text-sm font-semibold text-zinc-100">
         {value}
       </p>
     </div>
@@ -1550,14 +1795,17 @@ function formatValue(
   value: number
 ) {
   if (
-    !Number.isFinite(value)
+    !Number.isFinite(
+      value
+    )
   ) {
     return "∞";
   }
 
   if (
-    Math.abs(value) >
-    100000
+    Math.abs(
+      value
+    ) > 100000
   ) {
     return value.toExponential(
       3
@@ -1565,7 +1813,9 @@ function formatValue(
   }
 
   if (
-    Math.abs(value) <
+    Math.abs(
+      value
+    ) <
       0.0001 &&
     value !== 0
   ) {
@@ -1574,5 +1824,7 @@ function formatValue(
     );
   }
 
-  return value.toFixed(5);
+  return value.toFixed(
+    5
+  );
 }
