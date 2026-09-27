@@ -9,6 +9,7 @@ import Sidebar, {
 import Topbar from "@/components/layout/Topbar";
 import Notebook from "@/components/notebook/Notebook";
 import AITutor from "@/components/ai/AITutor";
+import ModelVisualizationLab from "@/components/visualization/model-lab/ModelVisualizationLab";
 
 import { NotebookCellType } from "@/types/notebook";
 import { createRuntime } from "@/lib/api";
@@ -263,23 +264,17 @@ if (
 
 
     // =======================================================
-    // VISUAL ML
-    // =======================================================
+// VISUAL ML
+// =======================================================
 
-    if (
-      activeWorkspace ===
-      "Visual ML"
-    ) {
-      return (
-        <ComingSoon
-          icon="◉"
-          title="Visual ML"
-          description={
-            "Interactive machine-learning model visualizations will be available here."
-          }
-        />
-      );
-    }
+if (
+  activeWorkspace ===
+  "Visual ML"
+) {
+  return (
+    <ModelVisualizationLab />
+  );
+}
 
 
     // =======================================================
