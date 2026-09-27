@@ -1,0 +1,777 @@
+"use client";
+
+import { FeatureAnalysis } from "@/lib/api";
+
+interface Props {
+  analysis: FeatureAnalysis;
+}
+
+export default function PreprocessingGuide({
+  analysis,
+}: Props) {
+  if (!analysis.is_numeric) {
+    return null;
+  }
+
+  const feature = analysis.feature;
+
+  const imputation =
+    analysis.imputation_strategy;
+
+  const scaling =
+    analysis.scaling_strategy;
+
+  const transformation =
+    analysis.transformation_strategy;
+
+  return (
+    <div
+      style={{
+        marginTop: "14px",
+        padding: "16px",
+        borderRadius: "12px",
+        border:
+          "1px solid rgba(255,255,255,0.08)",
+        background:
+          "rgba(255,255,255,0.02)",
+      }}
+    >
+      {/* HEADER */}
+
+      <div>
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+          }}
+        >
+          🧪 Preprocessing Guide
+        </div>
+
+        <div
+          style={{
+            marginTop: "5px",
+            fontSize: "10px",
+            opacity: 0.6,
+            lineHeight: 1.6,
+          }}
+        >
+          ModelMind recommends preprocessing
+          steps based on this feature&apos;s
+          distribution and data quality.
+          Nothing is applied automatically.
+        </div>
+      </div>
+
+      {/* =====================================
+          STEP 1 — MISSING VALUES
+          ===================================== */}
+
+      <GuideSection
+        step="1"
+        title="Handle Missing Values"
+      >
+        {imputation === "none" ? (
+          <NoAction
+            text="No missing values were detected. Imputation is not currently required."
+          />
+        ) : (
+          <>
+            <Recommendation
+              value={
+                imputation === "mean"
+                  ? "Mean Imputation"
+                  : "Median Imputation"
+              }
+            />
+
+            <Reason>
+              {analysis.imputation_reason ??
+                "Inspect the missing values before choosing an imputation strategy."}
+            </Reason>
+
+            <Steps
+              items={[
+                "Import SimpleImputer from scikit-learn.",
+                `Select the ${feature} feature.`,
+                `Create an imputer using strategy="${
+                  imputation === "mean"
+                    ? "mean"
+                    : "median"
+                }".`,
+                "Fit the imputer using the available values.",
+                "Transform the feature to replace missing values.",
+                "Verify that the missing-value count has decreased as expected.",
+              ]}
+            />
+
+            <CodeBlock
+              code={getImputationCode(
+                feature,
+                imputation
+              )}
+            />
+          </>
+        )}
+      </GuideSection>
+
+      {/* =====================================
+          STEP 2 — TRANSFORMATION
+          ===================================== */}
+
+      <GuideSection
+        step="2"
+        title="Check Distribution Transformation"
+      >
+        {transformation === "none" ? (
+          <NoAction
+            text="No strong skewness was detected. A distribution transformation is not currently suggested."
+          />
+        ) : (
+          <>
+            <Recommendation
+              value={
+                transformation ===
+                "log1p_candidate"
+                  ? "Explore log1p"
+                  : "Explore Yeo-Johnson"
+              }
+            />
+
+            <Reason>
+              {analysis.transformation_reason ??
+                "Inspect whether transforming this feature improves its distribution."}
+            </Reason>
+
+            <Warning>
+              This is a candidate transformation,
+              not a mandatory step. Compare the
+              distribution and model performance
+              before deciding to keep it.
+            </Warning>
+
+            <Steps
+              items={
+                transformation ===
+                "log1p_candidate"
+                  ? [
+                      "Inspect the original distribution.",
+                      "Confirm that the feature contains no values below zero.",
+                      "Create a temporary transformed version using np.log1p().",
+                      "Compare the original and transformed distributions.",
+                      "Check the new skewness.",
+                      "Keep the transformation only if it makes sense for the feature and model.",
+                    ]
+                  : [
+                      "Inspect the original distribution.",
+                      "Import PowerTransformer from scikit-learn.",
+                      "Create a Yeo-Johnson transformer.",
+                      "Fit and transform the feature on a temporary copy.",
+                      "Compare the before and after distributions.",
+                      "Keep the transformation only if it is useful for the model.",
+                    ]
+              }
+            />
+
+            <CodeBlock
+              code={getTransformationCode(
+                feature,
+                transformation
+              )}
+            />
+          </>
+        )}
+      </GuideSection>
+
+      {/* =====================================
+          STEP 3 — SCALING
+          ===================================== */}
+
+      <GuideSection
+        step="3"
+        title="Consider Feature Scaling"
+      >
+        <Recommendation
+          value={getScalingName(
+            scaling
+          )}
+        />
+
+        <Reason>
+          {analysis.scaling_reason ??
+            "Scaling requirements depend on the machine-learning model you plan to use."}
+        </Reason>
+
+        <Warning>
+          Scaling is model-dependent. For example,
+          distance-based and gradient-based models
+          often benefit from scaling, while many
+          tree-based models generally do not require
+          it.
+        </Warning>
+
+        <Steps
+          items={getScalingSteps(
+            feature,
+            scaling
+          )}
+        />
+
+        <CodeBlock
+          code={getScalingCode(
+            feature,
+            scaling
+          )}
+        />
+      </GuideSection>
+
+      {/* =====================================
+          STEP 4 — VERIFY
+          ===================================== */}
+
+      <GuideSection
+        step="4"
+        title="Verify Before Training"
+      >
+        <Steps
+          items={[
+            "Check missing values again.",
+            "Inspect the distribution again.",
+            "Check whether extreme values still need investigation.",
+            "Confirm that preprocessing makes sense for the meaning of the feature.",
+            "Split training and test data correctly before fitting learned preprocessing transformations in a real ML pipeline.",
+            "Evaluate whether preprocessing improves model performance.",
+          ]}
+        />
+
+        <CodeBlock
+          code={`# Verify the feature
+
+print(df["${feature}"].describe())
+
+print(
+    "Missing values:",
+    df["${feature}"].isnull().sum()
+)
+
+print(
+    "Skewness:",
+    df["${feature}"].skew()
+)`}
+        />
+      </GuideSection>
+
+      {/* FINAL NOTE */}
+
+      <div
+        style={{
+          marginTop: "14px",
+          padding: "12px",
+          borderRadius: "8px",
+          background:
+            "rgba(100,160,255,0.04)",
+          border:
+            "1px solid rgba(100,160,255,0.12)",
+          fontSize: "10px",
+          lineHeight: 1.7,
+          opacity: 0.7,
+        }}
+      >
+        💡 <strong>ModelMind rule:</strong>{" "}
+        recommendations explain what you
+        can try. They do not automatically
+        change your dataset. You should
+        understand, preview and validate a
+        preprocessing step before using it.
+      </div>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   GUIDE SECTION
+   ========================================================= */
+
+function GuideSection({
+  step,
+  title,
+  children,
+}: {
+  step: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "14px",
+        padding: "13px",
+        borderRadius: "9px",
+        border:
+          "1px solid rgba(255,255,255,0.07)",
+        background:
+          "rgba(255,255,255,0.018)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        <div
+          style={{
+            width: "23px",
+            height: "23px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background:
+              "rgba(100,160,255,0.12)",
+            fontSize: "10px",
+            fontWeight: 700,
+          }}
+        >
+          {step}
+        </div>
+
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 700,
+          }}
+        >
+          {title}
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: "11px",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   RECOMMENDATION
+   ========================================================= */
+
+function Recommendation({
+  value,
+}: {
+  value: string;
+}) {
+  return (
+    <div
+      style={{
+        fontSize: "11px",
+        fontWeight: 700,
+      }}
+    >
+      Recommended: {value}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   REASON
+   ========================================================= */
+
+function Reason({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "7px",
+        fontSize: "10px",
+        lineHeight: 1.7,
+        opacity: 0.7,
+      }}
+    >
+      <strong>Why?</strong>{" "}
+      {children}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   WARNING / TEACHING NOTE
+   ========================================================= */
+
+function Warning({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "9px",
+        padding: "9px",
+        borderRadius: "7px",
+        background:
+          "rgba(255,190,80,0.04)",
+        border:
+          "1px solid rgba(255,190,80,0.12)",
+        fontSize: "10px",
+        lineHeight: 1.6,
+        opacity: 0.72,
+      }}
+    >
+      ⚠️ {children}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   NO ACTION
+   ========================================================= */
+
+function NoAction({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div
+      style={{
+        fontSize: "10px",
+        lineHeight: 1.7,
+        opacity: 0.65,
+      }}
+    >
+      ✅ {text}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   STEPS
+   ========================================================= */
+
+function Steps({
+  items,
+}: {
+  items: string[];
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "11px",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "10px",
+          fontWeight: 700,
+          marginBottom: "7px",
+        }}
+      >
+        How to apply
+      </div>
+
+      {items.map(
+        (item, index) => (
+          <div
+            key={index}
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginTop: "6px",
+              fontSize: "10px",
+              lineHeight: 1.55,
+              opacity: 0.7,
+            }}
+          >
+            <span
+              style={{
+                minWidth: "16px",
+                fontWeight: 700,
+              }}
+            >
+              {index + 1}.
+            </span>
+
+            <span>{item}</span>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   CODE BLOCK
+   ========================================================= */
+
+function CodeBlock({
+  code,
+}: {
+  code: string;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "12px",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "9px",
+          opacity: 0.5,
+          marginBottom: "5px",
+        }}
+      >
+        Example Python code
+      </div>
+
+      <pre
+        style={{
+          margin: 0,
+          padding: "11px",
+          borderRadius: "7px",
+          overflowX: "auto",
+          background:
+            "rgba(0,0,0,0.25)",
+          border:
+            "1px solid rgba(255,255,255,0.06)",
+          fontSize: "10px",
+          lineHeight: 1.6,
+        }}
+      >
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   CODE GENERATORS
+   ========================================================= */
+
+function getImputationCode(
+  feature: string,
+  strategy:
+    FeatureAnalysis[
+      "imputation_strategy"
+    ]
+): string {
+  if (strategy === "none") {
+    return `# No imputation is currently required for ${feature}`;
+  }
+
+  const selectedStrategy =
+    strategy === "mean"
+      ? "mean"
+      : "median";
+
+  return `from sklearn.impute import SimpleImputer
+
+imputer = SimpleImputer(
+    strategy="${selectedStrategy}"
+)
+
+df["${feature}"] = imputer.fit_transform(
+    df[["${feature}"]]
+).ravel()
+
+print(
+    df["${feature}"].isnull().sum()
+)`;
+}
+
+
+function getTransformationCode(
+  feature: string,
+  strategy:
+    FeatureAnalysis[
+      "transformation_strategy"
+    ]
+): string {
+  if (
+    strategy === "log1p_candidate"
+  ) {
+    return `import numpy as np
+
+# Create a preview column first.
+# Your original feature remains available.
+
+df["${feature}_log_preview"] = np.log1p(
+    df["${feature}"]
+)
+
+print(
+    df[
+        [
+            "${feature}",
+            "${feature}_log_preview"
+        ]
+    ].head()
+)`;
+  }
+
+  if (
+    strategy ===
+    "power_transform_candidate"
+  ) {
+    return `from sklearn.preprocessing import PowerTransformer
+
+transformer = PowerTransformer(
+    method="yeo-johnson"
+)
+
+df["${feature}_yeojohnson_preview"] = (
+    transformer.fit_transform(
+        df[["${feature}"]]
+    ).ravel()
+)
+
+print(
+    df[
+        [
+            "${feature}",
+            "${feature}_yeojohnson_preview"
+        ]
+    ].head()
+)`;
+  }
+
+  return `# No distribution transformation is currently suggested for ${feature}`;
+}
+
+
+function getScalingName(
+  strategy:
+    FeatureAnalysis[
+      "scaling_strategy"
+    ]
+): string {
+  switch (strategy) {
+    case "standard":
+      return "Consider StandardScaler";
+
+    case "robust":
+      return "Consider RobustScaler";
+
+    case "inspect_after_transform":
+      return "Inspect After Transformation";
+
+    default:
+      return "Choose Based on Model";
+  }
+}
+
+
+function getScalingSteps(
+  feature: string,
+  strategy:
+    FeatureAnalysis[
+      "scaling_strategy"
+    ]
+): string[] {
+  if (strategy === "robust") {
+    return [
+      `Inspect outliers in ${feature}.`,
+      "Check whether your selected ML model benefits from feature scaling.",
+      "Import RobustScaler.",
+      "Fit the scaler using training data only.",
+      "Transform validation/test data using the already-fitted scaler.",
+      "Compare model performance.",
+    ];
+  }
+
+  if (strategy === "standard") {
+    return [
+      `Inspect the distribution of ${feature}.`,
+      "Check whether your selected ML model is sensitive to feature scale.",
+      "Import StandardScaler.",
+      "Fit the scaler using training data only.",
+      "Transform validation/test data using the already-fitted scaler.",
+      "Compare model performance.",
+    ];
+  }
+
+  return [
+    `Inspect the skewness of ${feature}.`,
+    "Preview the suggested transformation first.",
+    "Inspect the transformed distribution.",
+    "Choose a scaler only if your ML model benefits from scaling.",
+    "Fit preprocessing using training data only.",
+    "Compare model performance before keeping the step.",
+  ];
+}
+
+
+function getScalingCode(
+  feature: string,
+  strategy:
+    FeatureAnalysis[
+      "scaling_strategy"
+    ]
+): string {
+  if (strategy === "robust") {
+    return `from sklearn.preprocessing import RobustScaler
+
+scaler = RobustScaler()
+
+df["${feature}_scaled_preview"] = (
+    scaler.fit_transform(
+        df[["${feature}"]]
+    ).ravel()
+)
+
+print(
+    df[
+        [
+            "${feature}",
+            "${feature}_scaled_preview"
+        ]
+    ].head()
+)`;
+  }
+
+  if (strategy === "standard") {
+    return `from sklearn.preprocessing import StandardScaler
+
+scaler = StandardScaler()
+
+df["${feature}_scaled_preview"] = (
+    scaler.fit_transform(
+        df[["${feature}"]]
+    ).ravel()
+)
+
+print(
+    df[
+        [
+            "${feature}",
+            "${feature}_scaled_preview"
+        ]
+    ].head()
+)`;
+  }
+
+  return `# Inspect transformation before choosing
+# the final scaler for ${feature}.
+
+print(
+    df["${feature}"].describe()
+)`;
+}

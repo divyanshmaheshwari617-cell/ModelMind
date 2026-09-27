@@ -1,69 +1,458 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+
+import Sidebar, {
+  Workspace,
+} from "@/components/layout/Sidebar";
+
+import Topbar from "@/components/layout/Topbar";
+import Notebook from "@/components/notebook/Notebook";
+import AITutor from "@/components/ai/AITutor";
+
+import { NotebookCellType } from "@/types/notebook";
+import { createRuntime } from "@/lib/api";
+
 
 export default function Home() {
+  // =========================================================
+  // WORKSPACE STATE
+  // =========================================================
+
+  const [
+    activeWorkspace,
+    setActiveWorkspace,
+  ] = useState<Workspace>("Notebook");
+
+
+  // =========================================================
+  // RUNTIME STATE
+  // =========================================================
+
+  const [
+    runtimeId,
+    setRuntimeId,
+  ] = useState<string | null>(null);
+
+  const [
+    runtimeStatus,
+    setRuntimeStatus,
+  ] = useState<
+    "connecting" | "ready" | "error"
+  >("connecting");
+
+
+  // =========================================================
+  // AI TUTOR STATE
+  // =========================================================
+
+  const [
+    aiAction,
+    setAIAction,
+  ] = useState("");
+
+  const [
+    selectedCell,
+    setSelectedCell,
+  ] =
+    useState<NotebookCellType | null>(
+      null
+    );
+
+
+  // =========================================================
+  // START MODELMIND PYTHON RUNTIME
+  // =========================================================
+
+  useEffect(() => {
+    async function startRuntime() {
+      try {
+        setRuntimeStatus(
+          "connecting"
+        );
+
+        const result =
+          await createRuntime();
+
+        setRuntimeId(
+          result.session_id
+        );
+
+        setRuntimeStatus(
+          "ready"
+        );
+
+        console.log(
+          "ModelMind runtime ready:",
+          result.session_id
+        );
+      } catch (error) {
+        console.error(
+          "Runtime connection failed:",
+          error
+        );
+
+        setRuntimeId(null);
+
+        setRuntimeStatus(
+          "error"
+        );
+      }
+    }
+
+    startRuntime();
+  }, []);
+
+
+  // =========================================================
+  // AI ACTION
+  // =========================================================
+
+  function handleAIAction(
+    action: string,
+    cell: NotebookCellType
+  ) {
+    setAIAction(action);
+    setSelectedCell(cell);
+  }
+
+
+  // =========================================================
+  // ACCEPT AI FIX
+  // =========================================================
+
+  function handleAcceptFix(
+    cellId: string,
+    correctedCode: string,
+    runAfterAccept: boolean
+  ) {
+    window.dispatchEvent(
+      new CustomEvent(
+        "modelmind-accept-fix",
+        {
+          detail: {
+            cellId,
+            correctedCode,
+            runAfterAccept,
+          },
+        }
+      )
+    );
+  }
+
+
+  // =========================================================
+  // WORKSPACE CONTENT
+  // =========================================================
+
+  function renderWorkspace() {
+    // =======================================================
+    // NOTEBOOK
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Notebook"
+    ) {
+      return (
+        <>
+          <Notebook
+            runtimeId={runtimeId}
+            runtimeStatus={
+              runtimeStatus
+            }
+            onAIAction={
+              handleAIAction
+            }
+          />
+
+          <AITutor
+            action={aiAction}
+            cell={selectedCell}
+            onAcceptFix={
+              handleAcceptFix
+            }
+          />
+        </>
+      );
+    }
+
+
+    // =======================================================
+    // VIDEO LEARNING
+    // =======================================================
+
+    // =======================================================
+// VIDEO LEARNING
+// =======================================================
+
+if (
+  activeWorkspace ===
+  "Video Learning"
+) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <ComingSoon
+      icon="▶"
+      title="Video Learning"
+      description={
+        "Educational Video Learning module will be connected here."
+      }
+    />
+  );
+}
+
+
+    // =======================================================
+    // HYPERPARAMETER LAB
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Hyperparameter Lab"
+    ) {
+      return (
+        <ComingSoon
+          icon="◫"
+          title="Hyperparameter Lab"
+          description={
+            "Interactive hyperparameter tuning and 3D model-performance visualization will be built here."
+          }
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+      );
+    }
+
+
+    // =======================================================
+    // DATASETS
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Datasets"
+    ) {
+      return (
+        <ComingSoon
+          icon="◫"
+          title="Datasets"
+          description={
+            "Dataset management will be available here. Dataset upload remains inside the notebook."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // DATASET INTELLIGENCE
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Dataset Intelligence"
+    ) {
+      return (
+        <ComingSoon
+          icon="◈"
+          title="Dataset Intelligence"
+          description={
+            "Dataset X-Ray, Target Analyzer and Feature Analyzer are currently available through the notebook."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // VISUAL ML
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Visual ML"
+    ) {
+      return (
+        <ComingSoon
+          icon="◉"
+          title="Visual ML"
+          description={
+            "Interactive machine-learning model visualizations will be available here."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // LEARN
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Learn"
+    ) {
+      return (
+        <ComingSoon
+          icon="◇"
+          title="Learn"
+          description={
+            "Learn Python, NumPy, Pandas, Matplotlib, Seaborn and machine learning step by step."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // ROADMAP
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Roadmap"
+    ) {
+      return (
+        <ComingSoon
+          icon="↗"
+          title="Learning Roadmap"
+          description={
+            "Your personalized day-by-day machine-learning learning path will appear here."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // EXPERIMENTS
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Experiments"
+    ) {
+      return (
+        <ComingSoon
+          icon="▤"
+          title="Experiments"
+          description={
+            "Saved models, experiments, metrics and comparisons will appear here."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // DASHBOARD
+    // =======================================================
+
+    return (
+      <ComingSoon
+        icon="M"
+        title="ModelMind Dashboard"
+        description={
+          "Your recent notebooks, learning progress, datasets and experiments will appear here."
+        }
+      />
+    );
+  }
+
+
+  // =========================================================
+  // MAIN UI
+  // =========================================================
+
+  return (
+    <main className="appShell">
+      <Sidebar
+        activeWorkspace={
+          activeWorkspace
+        }
+        onWorkspaceChange={
+          setActiveWorkspace
+        }
+      />
+
+      <section className="mainArea">
+        <Topbar />
+
+        <div className="workspace">
+          {renderWorkspace()}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+    </main>
+  );
+}
+
+
+// =============================================================
+// COMING SOON PLACEHOLDER
+// =============================================================
+
+interface ComingSoonProps {
+  icon: string;
+  title: string;
+  description: string;
+}
+
+
+function ComingSoon({
+  icon,
+  title,
+  description,
+}: ComingSoonProps) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "650px",
+          padding: "40px",
+          borderRadius: "16px",
+          border:
+            "1px solid rgba(255,255,255,0.08)",
+          background:
+            "rgba(255,255,255,0.02)",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "34px",
+          }}
+        >
+          {icon}
         </div>
-      </main>
+
+        <h2
+          style={{
+            marginTop: "14px",
+            marginBottom: "10px",
+          }}
+        >
+          {title}
+        </h2>
+
+        <p
+          style={{
+            margin: 0,
+            opacity: 0.65,
+            lineHeight: 1.7,
+            fontSize: "12px",
+          }}
+        >
+          {description}
+        </p>
+      </div>
     </div>
   );
 }

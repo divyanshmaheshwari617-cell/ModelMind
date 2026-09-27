@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# ModelMind secrets
+.env
+backend/.env
+# Educational Video - developed separately
+/components/education-video/
+/backend/education_video/
+# Python generated files
+__pycache__/
+*.pyc
+*.pyo
