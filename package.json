@@ -1,0 +1,29 @@
+{
+  "name": "modelmind-multiple-linear-regression",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "papaparse": "^5.5.3",
+    "plotly.js-dist-min": "^4.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-plotly.js": "^4.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/papaparse": "^5.3.16",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/react-plotly.js": "^2.6.4",
+    "@vitejs/plugin-react": "^5.0.4",
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}
