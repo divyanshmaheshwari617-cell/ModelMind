@@ -1,19 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   analyzePythonError,
   AIErrorResult,
-  ExplanationLevel,
 } from "@/lib/api";
 
-import { NotebookCellType } from "@/types/notebook";
+import {
+  LearningLevel,
+} from "@/types/learning";
+
+import {
+  NotebookCellType,
+} from "@/types/notebook";
+
 
 interface Props {
   action: string;
 
   cell: NotebookCellType | null;
+
+  learningLevel: LearningLevel;
 
   onAcceptFix: (
     cellId: string,
@@ -22,44 +34,60 @@ interface Props {
   ) => void;
 }
 
+
 interface DiffLine {
-  type: "same" | "removed" | "added";
+  type:
+    | "same"
+    | "removed"
+    | "added";
+
   text: string;
 }
+
 
 /*
  * Simple line-by-line diff.
  *
- * For our current ModelMind prototype this gives us:
+ * For our current ModelMind prototype:
  *
  * unchanged -> normal
  * old       -> red
  * new       -> green
  *
- * Later we can replace this with a more advanced
+ * Later this can be replaced by a
  * character-level diff engine.
  */
+
 function createCodeDiff(
   originalCode: string,
   fixedCode: string
 ): DiffLine[] {
-  const oldLines = originalCode.split("\n");
-  const newLines = fixedCode.split("\n");
+  const oldLines =
+    originalCode.split("\n");
+
+  const newLines =
+    fixedCode.split("\n");
 
   const result: DiffLine[] = [];
 
-  const maximumLength = Math.max(
-    oldLines.length,
-    newLines.length
-  );
+  const maximumLength =
+    Math.max(
+      oldLines.length,
+      newLines.length
+    );
 
-  for (let i = 0; i < maximumLength; i++) {
+  for (
+    let i = 0;
+    i < maximumLength;
+    i++
+  ) {
     const oldLine = oldLines[i];
     const newLine = newLines[i];
 
     /*
      * Same line.
      */
+
     if (oldLine === newLine) {
       if (oldLine !== undefined) {
         result.push({
@@ -72,8 +100,9 @@ function createCodeDiff(
     }
 
     /*
-     * Existing line changed/removed.
+     * Existing line changed / removed.
      */
+
     if (oldLine !== undefined) {
       result.push({
         type: "removed",
@@ -82,8 +111,9 @@ function createCodeDiff(
     }
 
     /*
-     * New line changed/added.
+     * New line changed / added.
      */
+
     if (newLine !== undefined) {
       result.push({
         type: "added",
@@ -95,89 +125,175 @@ function createCodeDiff(
   return result;
 }
 
+
 export default function AITutor({
   action,
   cell,
+  learningLevel,
   onAcceptFix,
 }: Props) {
-  const [level, setLevel] =
-    useState<ExplanationLevel>("Basic");
+  const [
+    result,
+    setResult,
+  ] =
+    useState<AIErrorResult | null>(
+      null
+    );
 
-  const [result, setResult] =
-    useState<AIErrorResult | null>(null);
-
-  const [loading, setLoading] =
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(false);
 
-  const [message, setMessage] =
+  const [
+    message,
+    setMessage,
+  ] =
     useState("");
 
-  const [currentMode, setCurrentMode] =
-    useState<"explain" | "fix" | null>(null);
+  const [
+    currentMode,
+    setCurrentMode,
+  ] =
+    useState<
+      "explain" | "fix" | null
+    >(null);
+
 
   /*
-   * Reset the previous analysis whenever
+   * Reset previous analysis whenever
    * another notebook cell is selected.
    */
+
   useEffect(() => {
     setResult(null);
     setMessage("");
     setCurrentMode(null);
   }, [cell?.id]);
 
+
   /*
-   * When the user clicks Explain Error / Fix Error
-   * underneath a notebook cell, remember which
-   * operation they want.
+   * When the user changes the GLOBAL
+   * ModelMind learning level, clear any
+   * previous explanation.
+   *
+   * This prevents an explanation generated
+   * at Basic level from remaining visible
+   * after switching to Medium or Advanced.
    */
+
   useEffect(() => {
-    if (action === "Explain Error") {
-      setCurrentMode("explain");
+    setResult(null);
+
+    if (cell?.error) {
+      setMessage(
+        `Learning level changed to ${learningLevel}. Run Explain Error or Fix Error again to use this level.`
+      );
+    }
+  }, [
+    learningLevel,
+    cell?.error,
+  ]);
+
+
+  /*
+   * When the user clicks Explain Error /
+   * Fix Error underneath a notebook cell,
+   * remember which operation they want.
+   */
+
+  useEffect(() => {
+    if (
+      action ===
+      "Explain Error"
+    ) {
+      setCurrentMode(
+        "explain"
+      );
+
       setResult(null);
+
       setMessage(
         "Ready to explain this error."
       );
     }
 
-    if (action === "Fix Error") {
-      setCurrentMode("fix");
+    if (
+      action ===
+      "Fix Error"
+    ) {
+      setCurrentMode(
+        "fix"
+      );
+
       setResult(null);
+
       setMessage(
         "Ready to generate a safe fix."
       );
     }
-  }, [action, cell]);
+  }, [
+    action,
+    cell,
+  ]);
+
 
   /*
-   * Build red/green code preview.
+   * Build red / green code preview.
    */
-  const diffLines = useMemo(() => {
-    if (
-      !cell ||
-      !result?.fixed_code
-    ) {
-      return [];
-    }
 
-    return createCodeDiff(
-      cell.content,
-      result.fixed_code
-    );
-  }, [cell, result]);
+  const diffLines =
+    useMemo(() => {
+      if (
+        !cell ||
+        !result?.fixed_code
+      ) {
+        return [];
+      }
 
-  const changedLineCount = useMemo(() => {
-    return diffLines.filter(
-      (line) => line.type !== "same"
-    ).length;
-  }, [diffLines]);
+      return createCodeDiff(
+        cell.content,
+        result.fixed_code
+      );
+    }, [
+      cell,
+      result,
+    ]);
+
+
+  const changedLineCount =
+    useMemo(() => {
+      return diffLines.filter(
+        (line) =>
+          line.type !== "same"
+      ).length;
+    }, [
+      diffLines,
+    ]);
+
+
+  /*
+   * Ask ModelMind Error Intelligence.
+   *
+   * IMPORTANT:
+   * learningLevel comes from the GLOBAL
+   * application setting.
+   *
+   * There is no independent AI Tutor
+   * Basic / Intermediate / Advanced state.
+   */
 
   async function requestAI(
-    selectedAction: "explain" | "fix"
+    selectedAction:
+      | "explain"
+      | "fix"
   ) {
     if (!cell) {
       setMessage(
         "Select a notebook cell first."
       );
+
       return;
     }
 
@@ -185,13 +301,17 @@ export default function AITutor({
       setMessage(
         "Run the cell first so ModelMind can inspect the error."
       );
+
       return;
     }
 
     setLoading(true);
     setResult(null);
     setMessage("");
-    setCurrentMode(selectedAction);
+
+    setCurrentMode(
+      selectedAction
+    );
 
     try {
       const response =
@@ -199,17 +319,19 @@ export default function AITutor({
           cell.content,
           cell.error,
           selectedAction,
-          level
+          learningLevel
         );
 
       setResult(response);
 
       /*
-       * Local debugger understands the error
-       * but cannot safely rewrite it.
+       * Local debugger understands the
+       * error but cannot safely rewrite it.
        */
+
       if (
-        selectedAction === "fix" &&
+        selectedAction ===
+          "fix" &&
         !response.fixed_code
       ) {
         setMessage(
@@ -229,14 +351,17 @@ export default function AITutor({
     }
   }
 
+
   function cancelFix() {
     setResult(null);
+
     setCurrentMode(null);
 
     setMessage(
       "Fix cancelled. Your original code was not changed."
     );
   }
+
 
   function acceptFix(
     runAfterAccept: boolean
@@ -255,6 +380,7 @@ export default function AITutor({
     );
 
     setResult(null);
+
     setCurrentMode(null);
 
     setMessage(
@@ -264,8 +390,10 @@ export default function AITutor({
     );
   }
 
+
   return (
     <aside className="aiPanel">
+
       {/* ===================================================
           HEADER
           =================================================== */}
@@ -282,51 +410,73 @@ export default function AITutor({
         </div>
       </div>
 
+
       <p className="aiHelp">
-        Understand the problem before changing
-        your code.
+        Understand the problem before
+        changing your code.
       </p>
 
+
       {/* ===================================================
-          LEVEL
+          GLOBAL LEARNING LEVEL
           =================================================== */}
 
-      <div className="levelSelector">
-        {(
-          [
-            "Basic",
-            "Intermediate",
-            "Advanced",
-          ] as ExplanationLevel[]
-        ).map((item) => (
-          <button
-            key={item}
-            className={
-              level === item
-                ? "levelActive"
-                : ""
-            }
-            onClick={() =>
-              setLevel(item)
-            }
-          >
-            {item}
-          </button>
-        ))}
+      <div
+        style={{
+          marginBottom: "14px",
+          padding: "10px 12px",
+
+          border:
+            "1px solid rgba(114,226,138,0.18)",
+
+          borderRadius: "8px",
+
+          background:
+            "rgba(114,226,138,0.05)",
+
+          display: "flex",
+          alignItems: "center",
+          justifyContent:
+            "space-between",
+
+          gap: "10px",
+
+          fontSize: "12px",
+        }}
+      >
+        <span
+          style={{
+            opacity: 0.65,
+          }}
+        >
+          Learning level
+        </span>
+
+        <strong
+          style={{
+            color: "#72e28a",
+          }}
+        >
+          {learningLevel}
+        </strong>
       </div>
+
 
       {/* ===================================================
           TOOLS
           =================================================== */}
 
       <div className="aiTools">
+
         <button
           disabled={
             loading ||
             !cell?.error
           }
           onClick={() =>
-            requestAI("explain")
+            requestAI(
+              "explain"
+            )
           }
         >
           <span className="toolIcon">
@@ -339,10 +489,12 @@ export default function AITutor({
             </strong>
 
             <small>
-              Understand why your code failed.
+              Understand why your
+              code failed.
             </small>
           </span>
         </button>
+
 
         <button
           disabled={
@@ -350,7 +502,9 @@ export default function AITutor({
             !cell?.error
           }
           onClick={() =>
-            requestAI("fix")
+            requestAI(
+              "fix"
+            )
           }
         >
           <span className="toolIcon">
@@ -363,11 +517,14 @@ export default function AITutor({
             </strong>
 
             <small>
-              Preview changes before applying them.
+              Preview changes before
+              applying them.
             </small>
           </span>
         </button>
+
       </div>
+
 
       {/* ===================================================
           SELECTED CELL
@@ -375,6 +532,7 @@ export default function AITutor({
 
       {cell && (
         <div className="selectedCellCard">
+
           <span className="responseLabel">
             SELECTED CELL
           </span>
@@ -382,8 +540,10 @@ export default function AITutor({
           <pre className="contextPreview">
             {cell.content}
           </pre>
+
         </div>
       )}
+
 
       {/* ===================================================
           LOADING
@@ -391,41 +551,50 @@ export default function AITutor({
 
       {loading && (
         <div className="debugLoading">
+
           <div className="debugLoadingIcon">
             ✦
           </div>
 
           <div>
             <strong>
-              ModelMind is analyzing your code
+              ModelMind is analyzing
+              your code
             </strong>
 
             <p>
-              Reading the traceback and locating
-              the cause...
+              Reading the traceback
+              and locating the cause...
             </p>
           </div>
+
         </div>
       )}
+
 
       {/* ===================================================
           MESSAGE
           =================================================== */}
 
-      {message && !loading && (
-        <div className="aiMessage">
-          {message}
-        </div>
-      )}
+      {message &&
+        !loading && (
+          <div className="aiMessage">
+            {message}
+          </div>
+        )}
+
 
       {/* ===================================================
           EXPLANATION RESULT
           =================================================== */}
 
       {result &&
-        currentMode === "explain" && (
+        currentMode ===
+          "explain" && (
           <div className="debugResult">
+
             <div className="debugResultHeader">
+
               <div>
                 <span className="responseLabel">
                   ERROR DETECTED
@@ -443,21 +612,60 @@ export default function AITutor({
                   ? "LOCAL"
                   : "ADVANCED"}
               </span>
+
             </div>
+
+
+            {/* CURRENT GLOBAL LEVEL */}
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+
+                marginBottom:
+                  "12px",
+
+                fontSize:
+                  "11px",
+
+                opacity: 0.7,
+              }}
+            >
+              <span>
+                Explanation level:
+              </span>
+
+              <strong
+                style={{
+                  color:
+                    "#72e28a",
+                }}
+              >
+                {learningLevel}
+              </strong>
+            </div>
+
 
             {result.line_number && (
               <div className="errorLocation">
+
                 <span>
-                  Line {result.line_number}
+                  Line{" "}
+                  {result.line_number}
                 </span>
 
                 <code>
                   {result.failing_line}
                 </code>
+
               </div>
             )}
 
+
             <div className="explanationBlock">
+
               <h4>
                 What happened?
               </h4>
@@ -465,9 +673,12 @@ export default function AITutor({
               <p>
                 {result.explanation}
               </p>
+
             </div>
 
+
             <div className="explanationBlock">
+
               <h4>
                 Python says
               </h4>
@@ -475,9 +686,12 @@ export default function AITutor({
               <p>
                 {result.why}
               </p>
+
             </div>
 
+
             <div className="explanationBlock">
+
               <h4>
                 How do I solve it?
               </h4>
@@ -485,30 +699,39 @@ export default function AITutor({
               <p>
                 {result.how_to_fix}
               </p>
+
             </div>
+
 
             {result.fixed_code && (
               <button
                 className="generateFixButton"
                 onClick={() =>
-                  requestAI("fix")
+                  requestAI(
+                    "fix"
+                  )
                 }
               >
                 ✦ Show suggested fix
               </button>
             )}
+
           </div>
         )}
+
 
       {/* ===================================================
           FIX RESULT
           =================================================== */}
 
       {result &&
-        currentMode === "fix" &&
+        currentMode ===
+          "fix" &&
         result.fixed_code && (
           <div className="fixResult">
+
             <div className="fixResultHeader">
+
               <div>
                 <span className="responseLabel">
                   PROPOSED FIX
@@ -522,34 +745,47 @@ export default function AITutor({
               <span className="reviewBadge">
                 REVIEW
               </span>
+
             </div>
 
+
             <p className="fixDescription">
-              ModelMind will not change your code
-              until you accept this suggestion.
+              ModelMind will not change
+              your code until you accept
+              this suggestion.
             </p>
+
 
             {/* =============================================
                 RED / GREEN DIFF
                 ============================================= */}
 
             <div className="codeDiff">
+
               <div className="codeDiffHeader">
+
                 <span>
                   Code changes
                 </span>
 
                 <span>
-                  {changedLineCount} change
+                  {changedLineCount}{" "}
+                  change
                   {changedLineCount === 1
                     ? ""
                     : "s"}
                 </span>
+
               </div>
 
+
               <div className="diffCode">
+
                 {diffLines.map(
-                  (line, index) => (
+                  (
+                    line,
+                    index
+                  ) => (
                     <div
                       key={`${index}-${line.type}`}
                       className={`diffLine ${
@@ -576,17 +812,22 @@ export default function AITutor({
                         {line.text ||
                           " "}
                       </code>
+
                     </div>
                   )
                 )}
+
               </div>
+
             </div>
+
 
             {/* =============================================
                 WHY
                 ============================================= */}
 
             <div className="fixReason">
+
               <span className="fixReasonIcon">
                 ✦
               </span>
@@ -601,45 +842,61 @@ export default function AITutor({
                     result.how_to_fix}
                 </p>
               </div>
+
             </div>
+
 
             {/* =============================================
                 ACTIONS
                 ============================================= */}
 
             <div className="fixActionBar">
+
               <button
                 className="cancelFixButton"
-                onClick={cancelFix}
+                onClick={
+                  cancelFix
+                }
               >
                 Cancel
               </button>
 
+
               <button
                 className="acceptFixButton"
                 onClick={() =>
-                  acceptFix(false)
+                  acceptFix(
+                    false
+                  )
                 }
               >
                 ✓ Accept Fix
               </button>
 
+
               <button
                 className="acceptRunButton"
                 onClick={() =>
-                  acceptFix(true)
+                  acceptFix(
+                    true
+                  )
                 }
               >
                 ▶ Accept & Run
               </button>
+
             </div>
 
+
             <p className="fixSafetyText">
-              Review AI-generated or automated
-              changes before accepting them.
+              Review AI-generated or
+              automated changes before
+              accepting them.
             </p>
+
           </div>
         )}
+
     </aside>
   );
 }

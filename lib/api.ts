@@ -111,7 +111,7 @@ export async function executePython(
 
 export type ExplanationLevel =
   | "Basic"
-  | "Intermediate"
+  | "Medium"
   | "Advanced";
 
 export type DebugAction =

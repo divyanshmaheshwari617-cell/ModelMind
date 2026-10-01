@@ -14,8 +14,31 @@ import ModelVisualizationLab from "@/components/visualization/model-lab/ModelVis
 import { NotebookCellType } from "@/types/notebook";
 import { createRuntime } from "@/lib/api";
 
+import {
+  LearningLevel,
+  LEARNING_LEVEL_STORAGE_KEY,
+  isLearningLevel,
+} from "@/types/learning";
+
 
 export default function Home() {
+  // =========================================================
+  // GLOBAL LEARNING LEVEL
+  // =========================================================
+
+  const [
+    learningLevel,
+    setLearningLevel,
+  ] = useState<LearningLevel>(
+    "Basic"
+  );
+
+  const [
+    learningLevelLoaded,
+    setLearningLevelLoaded,
+  ] = useState(false);
+
+
   // =========================================================
   // WORKSPACE STATE
   // =========================================================
@@ -59,6 +82,43 @@ export default function Home() {
     useState<NotebookCellType | null>(
       null
     );
+
+
+  // =========================================================
+  // LOAD SAVED GLOBAL LEARNING LEVEL
+  // =========================================================
+
+  useEffect(() => {
+    const savedLevel =
+      window.localStorage.getItem(
+        LEARNING_LEVEL_STORAGE_KEY
+      );
+
+    if (isLearningLevel(savedLevel)) {
+      setLearningLevel(savedLevel);
+    }
+
+    setLearningLevelLoaded(true);
+  }, []);
+
+
+  // =========================================================
+  // SAVE GLOBAL LEARNING LEVEL
+  // =========================================================
+
+  useEffect(() => {
+    if (!learningLevelLoaded) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      LEARNING_LEVEL_STORAGE_KEY,
+      learningLevel
+    );
+  }, [
+    learningLevel,
+    learningLevelLoaded,
+  ]);
 
 
   // =========================================================
@@ -162,6 +222,9 @@ export default function Home() {
             runtimeStatus={
               runtimeStatus
             }
+            learningLevel={
+              learningLevel
+            }
             onAIAction={
               handleAIAction
             }
@@ -170,6 +233,9 @@ export default function Home() {
           <AITutor
             action={aiAction}
             cell={selectedCell}
+            learningLevel={
+              learningLevel
+            }
             onAcceptFix={
               handleAcceptFix
             }
@@ -183,24 +249,20 @@ export default function Home() {
     // VIDEO LEARNING
     // =======================================================
 
-    // =======================================================
-// VIDEO LEARNING
-// =======================================================
-
-if (
-  activeWorkspace ===
-  "Video Learning"
-) {
-  return (
-    <ComingSoon
-      icon="▶"
-      title="Video Learning"
-      description={
-        "Educational Video Learning module will be connected here."
-      }
-    />
-  );
-}
+    if (
+      activeWorkspace ===
+      "Video Learning"
+    ) {
+      return (
+        <ComingSoon
+          icon="▶"
+          title="Video Learning"
+          description={
+            "Educational Video Learning module will be connected here."
+          }
+        />
+      );
+    }
 
 
     // =======================================================
@@ -264,17 +326,17 @@ if (
 
 
     // =======================================================
-// VISUAL ML
-// =======================================================
+    // VISUAL ML
+    // =======================================================
 
-if (
-  activeWorkspace ===
-  "Visual ML"
-) {
-  return (
-    <ModelVisualizationLab />
-  );
-}
+    if (
+      activeWorkspace ===
+      "Visual ML"
+    ) {
+      return (
+        <ModelVisualizationLab />
+      );
+    }
 
 
     // =======================================================
@@ -369,7 +431,14 @@ if (
       />
 
       <section className="mainArea">
-        <Topbar />
+        <Topbar
+          learningLevel={
+            learningLevel
+          }
+          onLearningLevelChange={
+            setLearningLevel
+          }
+        />
 
         <div className="workspace">
           {renderWorkspace()}

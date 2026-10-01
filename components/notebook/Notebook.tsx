@@ -7,6 +7,7 @@ import NotebookToolbar from "./NotebookToolbar";
 import DatasetXRay from "@/components/dataset/DatasetXRay";
 
 import { NotebookCellType } from "@/types/notebook";
+import { LearningLevel } from "@/types/learning";
 
 import {
   executePython,
@@ -23,6 +24,8 @@ interface Props {
     | "ready"
     | "error";
 
+  learningLevel: LearningLevel;
+
   onAIAction: (
     action: string,
     cell: NotebookCellType
@@ -38,6 +41,7 @@ interface AcceptFixEvent {
 export default function Notebook({
   runtimeId,
   runtimeStatus,
+  learningLevel,
   onAIAction,
 }: Props) {
   const [cells, setCells] =
@@ -235,7 +239,7 @@ async function executeCell(
       const mlAnalysis =
   await analyzeMLMistakes(
     analysisCode,
-    "Basic"
+    learningLevel
   );
 
       setCells((previous) =>
@@ -569,7 +573,7 @@ df.head()`;
         acceptFix
       );
     };
-  }, [runtimeId]);
+  }, [runtimeId, learningLevel]);
 
   return (
     <section className="notebookSection">
