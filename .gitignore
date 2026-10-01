@@ -49,3 +49,9 @@ backend/.env
 __pycache__/
 *.pyc
 *.pyo
+# Local ModelMind backup archives
+.next.zip
+app.zip
+backend.zip
+components.zip
+lib.zip
