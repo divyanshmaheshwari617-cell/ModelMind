@@ -801,3 +801,122 @@ export async function analyzeMLMistakes(
 
   return response.json();
 }
+/* =========================================================
+   MODELMIND CODE EXPLAINER
+   ========================================================= */
+
+export interface CodeExplanationStep {
+  line_number: number | null;
+  code: string;
+  title: string;
+  explanation: string;
+}
+
+export interface CodeExplanationConcept {
+  title: string;
+  explanation: string;
+  line_number: number | null;
+}
+
+export interface CodeExplanationVariable {
+  name: string;
+  line_number: number | null;
+  assigned_from: string;
+  explanation: string;
+}
+
+export interface CodeExplanationLibrary {
+  name: string;
+  imported_as: string;
+  line_number: number | null;
+  explanation: string;
+}
+
+export interface CodeExplanationMLFlow {
+  stage: string;
+  explanation: string;
+  line_number: number | null;
+}
+
+export interface CodeExplanationNote {
+  title: string;
+  explanation: string;
+}
+
+export interface CodeExplanationWarning {
+  title: string;
+  message: string;
+}
+
+export interface CodeExplanationResult {
+  handled: boolean;
+
+  source: string;
+
+  engine: string;
+
+  level: string;
+
+  parse_success: boolean;
+
+  summary: string;
+
+  purpose: string;
+
+  steps: CodeExplanationStep[];
+
+  concepts: CodeExplanationConcept[];
+
+  variables: CodeExplanationVariable[];
+
+  libraries: CodeExplanationLibrary[];
+
+  ml_flow: CodeExplanationMLFlow[];
+
+  advanced_notes: CodeExplanationNote[];
+
+  warnings: CodeExplanationWarning[];
+
+  confidence: number;
+}
+
+export async function explainPythonCode(
+  code: string,
+  level: ExplanationLevel = "Basic"
+): Promise<CodeExplanationResult> {
+  const response = await fetch(
+    `${API_URL}/ai/explain-code`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        code,
+        level,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    let message =
+      "ModelMind could not explain this code.";
+
+    try {
+      const errorData =
+        await response.json();
+
+      if (errorData.detail) {
+        message = errorData.detail;
+      }
+    } catch {
+      // Backend did not return JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}

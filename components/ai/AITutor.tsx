@@ -8,7 +8,9 @@ import {
 
 import {
   analyzePythonError,
+  explainPythonCode,
   AIErrorResult,
+  CodeExplanationResult,
 } from "@/lib/api";
 
 import {
@@ -45,18 +47,16 @@ interface DiffLine {
 }
 
 
-/*
- * Simple line-by-line diff.
- *
- * For our current ModelMind prototype:
- *
- * unchanged -> normal
- * old       -> red
- * new       -> green
- *
- * Later this can be replaced by a
- * character-level diff engine.
- */
+type TutorMode =
+  | "code"
+  | "explain"
+  | "fix"
+  | null;
+
+
+/* =========================================================
+   SIMPLE CODE DIFF
+   ========================================================= */
 
 function createCodeDiff(
   originalCode: string,
@@ -84,10 +84,6 @@ function createCodeDiff(
     const oldLine = oldLines[i];
     const newLine = newLines[i];
 
-    /*
-     * Same line.
-     */
-
     if (oldLine === newLine) {
       if (oldLine !== undefined) {
         result.push({
@@ -99,20 +95,12 @@ function createCodeDiff(
       continue;
     }
 
-    /*
-     * Existing line changed / removed.
-     */
-
     if (oldLine !== undefined) {
       result.push({
         type: "removed",
         text: oldLine,
       });
     }
-
-    /*
-     * New line changed / added.
-     */
 
     if (newLine !== undefined) {
       result.push({
@@ -126,6 +114,10 @@ function createCodeDiff(
 }
 
 
+/* =========================================================
+   COMPONENT
+   ========================================================= */
+
 export default function AITutor({
   action,
   cell,
@@ -137,6 +129,14 @@ export default function AITutor({
     setResult,
   ] =
     useState<AIErrorResult | null>(
+      null
+    );
+
+  const [
+    codeResult,
+    setCodeResult,
+  ] =
+    useState<CodeExplanationResult | null>(
       null
     );
 
@@ -156,78 +156,72 @@ export default function AITutor({
     currentMode,
     setCurrentMode,
   ] =
-    useState<
-      "explain" | "fix" | null
-    >(null);
+    useState<TutorMode>(null);
 
 
-  /*
-   * Reset previous analysis whenever
-   * another notebook cell is selected.
-   */
+  /* =======================================================
+     RESET WHEN CELL CHANGES
+     ======================================================= */
 
   useEffect(() => {
     setResult(null);
+    setCodeResult(null);
     setMessage("");
     setCurrentMode(null);
   }, [cell?.id]);
 
 
-  /*
-   * When the user changes the GLOBAL
-   * ModelMind learning level, clear any
-   * previous explanation.
-   *
-   * This prevents an explanation generated
-   * at Basic level from remaining visible
-   * after switching to Medium or Advanced.
-   */
+  /* =======================================================
+     RESET WHEN GLOBAL LEVEL CHANGES
+     ======================================================= */
 
   useEffect(() => {
     setResult(null);
+    setCodeResult(null);
 
-    if (cell?.error) {
+    if (cell) {
       setMessage(
-        `Learning level changed to ${learningLevel}. Run Explain Error or Fix Error again to use this level.`
+        `Learning level changed to ${learningLevel}. Run the explanation again to use this level.`
       );
     }
   }, [
     learningLevel,
-    cell?.error,
+    cell,
   ]);
 
 
-  /*
-   * When the user clicks Explain Error /
-   * Fix Error underneath a notebook cell,
-   * remember which operation they want.
-   */
+  /* =======================================================
+     NOTEBOOK ACTIONS
+     ======================================================= */
 
   useEffect(() => {
-    if (
-      action ===
-      "Explain Error"
-    ) {
-      setCurrentMode(
-        "explain"
-      );
+    if (!cell) {
+      return;
+    }
 
+    if (action === "Explain Code") {
+      setCurrentMode("code");
       setResult(null);
+      setCodeResult(null);
+      setMessage("");
+
+      void requestCodeExplanation();
+    }
+
+    if (action === "Explain Error") {
+      setCurrentMode("explain");
+      setResult(null);
+      setCodeResult(null);
 
       setMessage(
         "Ready to explain this error."
       );
     }
 
-    if (
-      action ===
-      "Fix Error"
-    ) {
-      setCurrentMode(
-        "fix"
-      );
-
+    if (action === "Fix Error") {
+      setCurrentMode("fix");
       setResult(null);
+      setCodeResult(null);
 
       setMessage(
         "Ready to generate a safe fix."
@@ -239,9 +233,9 @@ export default function AITutor({
   ]);
 
 
-  /*
-   * Build red / green code preview.
-   */
+  /* =======================================================
+     CODE DIFF
+     ======================================================= */
 
   const diffLines =
     useMemo(() => {
@@ -273,16 +267,65 @@ export default function AITutor({
     ]);
 
 
-  /*
-   * Ask ModelMind Error Intelligence.
-   *
-   * IMPORTANT:
-   * learningLevel comes from the GLOBAL
-   * application setting.
-   *
-   * There is no independent AI Tutor
-   * Basic / Intermediate / Advanced state.
-   */
+  /* =======================================================
+     CODE EXPLAINER
+     ======================================================= */
+
+  async function requestCodeExplanation() {
+    if (!cell) {
+      setMessage(
+        "Select a notebook cell first."
+      );
+
+      return;
+    }
+
+    if (!cell.content.trim()) {
+      setMessage(
+        "This notebook cell is empty."
+      );
+
+      return;
+    }
+
+    setLoading(true);
+
+    setResult(null);
+    setCodeResult(null);
+
+    setMessage("");
+
+    setCurrentMode("code");
+
+    try {
+      const response =
+        await explainPythonCode(
+          cell.content,
+          learningLevel
+        );
+
+      setCodeResult(response);
+
+      if (!response.handled) {
+        setMessage(
+          "This code needs deeper analysis than the local Code Explainer currently provides."
+        );
+      }
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "ModelMind could not explain this code."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+
+  /* =======================================================
+     ERROR INTELLIGENCE
+     ======================================================= */
 
   async function requestAI(
     selectedAction:
@@ -306,7 +349,10 @@ export default function AITutor({
     }
 
     setLoading(true);
+
     setResult(null);
+    setCodeResult(null);
+
     setMessage("");
 
     setCurrentMode(
@@ -324,14 +370,8 @@ export default function AITutor({
 
       setResult(response);
 
-      /*
-       * Local debugger understands the
-       * error but cannot safely rewrite it.
-       */
-
       if (
-        selectedAction ===
-          "fix" &&
+        selectedAction === "fix" &&
         !response.fixed_code
       ) {
         setMessage(
@@ -352,8 +392,13 @@ export default function AITutor({
   }
 
 
+  /* =======================================================
+     FIX ACTIONS
+     ======================================================= */
+
   function cancelFix() {
     setResult(null);
+    setCodeResult(null);
 
     setCurrentMode(null);
 
@@ -380,6 +425,7 @@ export default function AITutor({
     );
 
     setResult(null);
+    setCodeResult(null);
 
     setCurrentMode(null);
 
@@ -391,12 +437,14 @@ export default function AITutor({
   }
 
 
+  /* =======================================================
+     UI
+     ======================================================= */
+
   return (
     <aside className="aiPanel">
 
-      {/* ===================================================
-          HEADER
-          =================================================== */}
+      {/* HEADER */}
 
       <div className="aiHeader">
         <div>
@@ -405,21 +453,19 @@ export default function AITutor({
           </span>
 
           <h3>
-            AI Debugging Tutor
+            AI Learning Tutor
           </h3>
         </div>
       </div>
 
 
       <p className="aiHelp">
-        Understand the problem before
-        changing your code.
+        Understand your code, errors,
+        and machine-learning workflow.
       </p>
 
 
-      {/* ===================================================
-          GLOBAL LEARNING LEVEL
-          =================================================== */}
+      {/* GLOBAL LEVEL */}
 
       <div
         style={{
@@ -462,11 +508,35 @@ export default function AITutor({
       </div>
 
 
-      {/* ===================================================
-          TOOLS
-          =================================================== */}
+      {/* TOOLS */}
 
       <div className="aiTools">
+
+        <button
+          disabled={
+            loading ||
+            !cell
+          }
+          onClick={
+            requestCodeExplanation
+          }
+        >
+          <span className="toolIcon">
+            &lt;/&gt;
+          </span>
+
+          <span>
+            <strong>
+              Explain Code
+            </strong>
+
+            <small>
+              Learn what this cell
+              is doing.
+            </small>
+          </span>
+        </button>
+
 
         <button
           disabled={
@@ -526,9 +596,7 @@ export default function AITutor({
       </div>
 
 
-      {/* ===================================================
-          SELECTED CELL
-          =================================================== */}
+      {/* SELECTED CELL */}
 
       {cell && (
         <div className="selectedCellCard">
@@ -545,9 +613,7 @@ export default function AITutor({
       )}
 
 
-      {/* ===================================================
-          LOADING
-          =================================================== */}
+      {/* LOADING */}
 
       {loading && (
         <div className="debugLoading">
@@ -563,8 +629,9 @@ export default function AITutor({
             </strong>
 
             <p>
-              Reading the traceback
-              and locating the cause...
+              {currentMode === "code"
+                ? "Understanding the code structure and ML workflow..."
+                : "Reading the traceback and locating the cause..."}
             </p>
           </div>
 
@@ -572,9 +639,7 @@ export default function AITutor({
       )}
 
 
-      {/* ===================================================
-          MESSAGE
-          =================================================== */}
+      {/* MESSAGE */}
 
       {message &&
         !loading && (
@@ -585,7 +650,508 @@ export default function AITutor({
 
 
       {/* ===================================================
-          EXPLANATION RESULT
+          CODE EXPLANATION RESULT
+          =================================================== */}
+
+      {codeResult &&
+        currentMode === "code" &&
+        !loading && (
+          <div className="debugResult">
+
+            <div className="debugResultHeader">
+
+              <div>
+                <span className="responseLabel">
+                  CODE EXPLANATION
+                </span>
+
+                <h3>
+                  What this code is doing
+                </h3>
+              </div>
+
+              <span className="localBadge">
+                {codeResult.source ===
+                "modelmind-local"
+                  ? "LOCAL"
+                  : "ADVANCED"}
+              </span>
+
+            </div>
+
+
+            {/* METADATA */}
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "8px",
+
+                marginBottom:
+                  "14px",
+
+                fontSize: "11px",
+                opacity: 0.75,
+              }}
+            >
+              <span>
+                Level:{" "}
+                <strong
+                  style={{
+                    color:
+                      "#72e28a",
+                  }}
+                >
+                  {learningLevel}
+                </strong>
+              </span>
+
+              <span>
+                •
+              </span>
+
+              <span>
+                Confidence:{" "}
+                {Math.round(
+                  codeResult.confidence *
+                    100
+                )}
+                %
+              </span>
+
+              <span>
+                •
+              </span>
+
+              <span>
+                {codeResult.source ===
+                "modelmind-local"
+                  ? "ModelMind Local"
+                  : codeResult.source}
+              </span>
+            </div>
+
+
+            {/* SUMMARY */}
+
+            <div className="explanationBlock">
+
+              <h4>
+                Summary
+              </h4>
+
+              <p>
+                {codeResult.summary}
+              </p>
+
+            </div>
+
+
+            {/* PURPOSE */}
+
+            {codeResult.purpose && (
+              <div className="explanationBlock">
+
+                <h4>
+                  Purpose
+                </h4>
+
+                <p>
+                  {codeResult.purpose}
+                </p>
+
+              </div>
+            )}
+
+
+            {/* ML FLOW */}
+
+            {codeResult.ml_flow.length >
+              0 && (
+              <div className="explanationBlock">
+
+                <h4>
+                  Machine-learning flow
+                </h4>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "10px",
+                  }}
+                >
+                  {codeResult.ml_flow.map(
+                    (
+                      item,
+                      index
+                    ) => (
+                      <div
+                        key={`${item.stage}-${index}`}
+                        style={{
+                          padding:
+                            "10px 12px",
+
+                          border:
+                            "1px solid rgba(114,226,138,0.14)",
+
+                          borderRadius:
+                            "8px",
+
+                          background:
+                            "rgba(114,226,138,0.035)",
+                        }}
+                      >
+                        <strong>
+                          {index + 1}.{" "}
+                          {item.stage}
+                        </strong>
+
+                        <p
+                          style={{
+                            margin:
+                              "6px 0 0",
+                          }}
+                        >
+                          {
+                            item.explanation
+                          }
+                        </p>
+
+                        {item.line_number && (
+                          <small
+                            style={{
+                              opacity:
+                                0.55,
+                            }}
+                          >
+                            Line{" "}
+                            {
+                              item.line_number
+                            }
+                          </small>
+                        )}
+                      </div>
+                    )
+                  )}
+                </div>
+
+              </div>
+            )}
+
+
+            {/* STEP BY STEP */}
+
+            {codeResult.steps.length >
+              0 && (
+              <div className="explanationBlock">
+
+                <h4>
+                  Step-by-step
+                </h4>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "12px",
+                  }}
+                >
+                  {codeResult.steps.map(
+                    (
+                      step,
+                      index
+                    ) => (
+                      <div
+                        key={`${step.line_number}-${index}`}
+                        style={{
+                          paddingBottom:
+                            "10px",
+
+                          borderBottom:
+                            "1px solid rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        <strong>
+                          {index + 1}.{" "}
+                          {step.title}
+                        </strong>
+
+                        {step.line_number && (
+                          <small
+                            style={{
+                              marginLeft:
+                                "8px",
+
+                              opacity:
+                                0.5,
+                            }}
+                          >
+                            Line{" "}
+                            {
+                              step.line_number
+                            }
+                          </small>
+                        )}
+
+                        {step.code && (
+                          <pre
+                            className="contextPreview"
+                            style={{
+                              marginTop:
+                                "8px",
+                            }}
+                          >
+                            {step.code}
+                          </pre>
+                        )}
+
+                        <p>
+                          {
+                            step.explanation
+                          }
+                        </p>
+                      </div>
+                    )
+                  )}
+                </div>
+
+              </div>
+            )}
+
+
+            {/* CONCEPTS */}
+
+            {codeResult.concepts.length >
+              0 && (
+              <div className="explanationBlock">
+
+                <h4>
+                  Concepts to understand
+                </h4>
+
+                {codeResult.concepts.map(
+                  (
+                    concept,
+                    index
+                  ) => (
+                    <div
+                      key={`${concept.title}-${index}`}
+                      style={{
+                        marginBottom:
+                          "12px",
+                      }}
+                    >
+                      <strong>
+                        {
+                          concept.title
+                        }
+                      </strong>
+
+                      <p>
+                        {
+                          concept.explanation
+                        }
+                      </p>
+                    </div>
+                  )
+                )}
+
+              </div>
+            )}
+
+
+            {/* VARIABLES */}
+
+            {codeResult.variables.length >
+              0 && (
+              <div className="explanationBlock">
+
+                <h4>
+                  Important variables
+                </h4>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "10px",
+                  }}
+                >
+                  {codeResult.variables.map(
+                    (
+                      variable,
+                      index
+                    ) => (
+                      <div
+                        key={`${variable.name}-${index}`}
+                      >
+                        <code>
+                          {
+                            variable.name
+                          }
+                        </code>
+
+                        <p
+                          style={{
+                            margin:
+                              "4px 0",
+                          }}
+                        >
+                          {
+                            variable.explanation
+                          }
+                        </p>
+
+                        {variable.assigned_from && (
+                          <small
+                            style={{
+                              opacity:
+                                0.55,
+                            }}
+                          >
+                            From:{" "}
+                            {
+                              variable.assigned_from
+                            }
+                          </small>
+                        )}
+                      </div>
+                    )
+                  )}
+                </div>
+
+              </div>
+            )}
+
+
+            {/* LIBRARIES */}
+
+            {codeResult.libraries.length >
+              0 && (
+              <div className="explanationBlock">
+
+                <h4>
+                  Libraries used
+                </h4>
+
+                {codeResult.libraries.map(
+                  (
+                    library,
+                    index
+                  ) => (
+                    <div
+                      key={`${library.name}-${index}`}
+                      style={{
+                        marginBottom:
+                          "10px",
+                      }}
+                    >
+                      <strong>
+                        {
+                          library.name
+                        }
+                      </strong>
+
+                      <p>
+                        {
+                          library.explanation
+                        }
+                      </p>
+                    </div>
+                  )
+                )}
+
+              </div>
+            )}
+
+
+            {/* ADVANCED / LEARNING NOTES */}
+
+            {codeResult.advanced_notes
+              .length > 0 && (
+              <div className="explanationBlock">
+
+                <h4>
+                  {learningLevel ===
+                  "Advanced"
+                    ? "Advanced insights"
+                    : "Learning notes"}
+                </h4>
+
+                {codeResult.advanced_notes.map(
+                  (
+                    note,
+                    index
+                  ) => (
+                    <div
+                      key={`${note.title}-${index}`}
+                      style={{
+                        marginBottom:
+                          "12px",
+                      }}
+                    >
+                      <strong>
+                        {note.title}
+                      </strong>
+
+                      <p>
+                        {
+                          note.explanation
+                        }
+                      </p>
+                    </div>
+                  )
+                )}
+
+              </div>
+            )}
+
+
+            {/* WARNINGS */}
+
+            {codeResult.warnings.length >
+              0 && (
+              <div className="explanationBlock">
+
+                <h4>
+                  Important notes
+                </h4>
+
+                {codeResult.warnings.map(
+                  (
+                    warning,
+                    index
+                  ) => (
+                    <div
+                      key={`${warning.title}-${index}`}
+                      style={{
+                        marginBottom:
+                          "10px",
+                      }}
+                    >
+                      <strong>
+                        {
+                          warning.title
+                        }
+                      </strong>
+
+                      <p>
+                        {
+                          warning.message
+                        }
+                      </p>
+                    </div>
+                  )
+                )}
+
+              </div>
+            )}
+
+          </div>
+        )}
+
+
+      {/* ===================================================
+          ERROR EXPLANATION
           =================================================== */}
 
       {result &&
@@ -615,8 +1181,6 @@ export default function AITutor({
 
             </div>
 
-
-            {/* CURRENT GLOBAL LEVEL */}
 
             <div
               style={{
@@ -756,10 +1320,6 @@ export default function AITutor({
             </p>
 
 
-            {/* =============================================
-                RED / GREEN DIFF
-                ============================================= */}
-
             <div className="codeDiff">
 
               <div className="codeDiffHeader">
@@ -822,10 +1382,6 @@ export default function AITutor({
             </div>
 
 
-            {/* =============================================
-                WHY
-                ============================================= */}
-
             <div className="fixReason">
 
               <span className="fixReasonIcon">
@@ -845,10 +1401,6 @@ export default function AITutor({
 
             </div>
 
-
-            {/* =============================================
-                ACTIONS
-                ============================================= */}
 
             <div className="fixActionBar">
 

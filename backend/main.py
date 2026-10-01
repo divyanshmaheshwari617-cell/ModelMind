@@ -19,6 +19,7 @@ from intelligence.dataset import (
     analyze_feature,
 )
 from debugger.ml_mistake_detector import analyze_ml_mistakes
+from debugger.code_explainer import explain_code
 
 app = FastAPI(
     title="ModelMind Backend",
@@ -54,6 +55,9 @@ class DebugRequest(BaseModel):
     level: str = "Basic"
 class MLMistakeRequest(BaseModel):
     code: str
+    level: str = "Basic"
+class CodeExplainRequest(BaseModel):
+    code: str = Field(max_length=50000)
     level: str = "Basic"
 
 
@@ -470,3 +474,25 @@ def debug_error(
     )
 
     return result
+# ==========================================
+# CODE EXPLAINER
+# ==========================================
+
+@app.post("/ai/explain-code")
+def explain_python_code(
+    request: CodeExplainRequest,
+):
+    try:
+        return explain_code(
+            code=request.code,
+            level=request.level,
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "ModelMind Code Explainer failed: "
+                f"{str(error)}"
+            ),
+        )
