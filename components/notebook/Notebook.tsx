@@ -15,6 +15,7 @@ import {
   UploadResult,
   analyzeMLMistakes,
 } from "@/lib/api";
+import PreprocessingAdvisorTest from "@/components/dataset/PreprocessingAdvisorTest";
 
 interface Props {
   runtimeId: string | null;
@@ -97,6 +98,25 @@ export default function Notebook({
       newCell,
     ]);
   }
+  function insertCodeCell(code: string) {
+  if (!code.trim()) {
+    return;
+  }
+
+  const newCell: NotebookCellType = {
+    id: crypto.randomUUID(),
+    type: "code",
+    content: code,
+    output: "",
+    error: "",
+    isRunning: false,
+  };
+
+  setCells((previous) => [
+    ...previous,
+    newCell,
+  ]);
+}
 
   function updateCell(
     id: string,
@@ -1041,16 +1061,36 @@ df.head()`;
     DATASET X-RAY
     ================================================== */}
 
+{/* ==================================================
+    DATASET X-RAY
+    ================================================== */}
+
 {showXRay &&
   uploadedFile?.dataset && (
     <DatasetXRay
-  dataset={uploadedFile.dataset}
-  runtimeId={runtimeId!}
-  filename={uploadedFile.filename}
-  onClose={() =>
-    setShowXRay(false)
-  }
-/>
+      dataset={uploadedFile.dataset}
+      runtimeId={runtimeId!}
+      filename={uploadedFile.filename}
+      onClose={() =>
+        setShowXRay(false)
+      }
+    />
+  )}
+
+
+{/* ==================================================
+    SMART PREPROCESSING ADVISOR 2.0
+    TEMPORARY TEST SURFACE
+    ================================================== */}
+
+{uploadedFile?.dataset &&
+  runtimeId && (
+    <PreprocessingAdvisorTest
+      runtimeId={runtimeId}
+      filename={uploadedFile.filename}
+      learningLevel={learningLevel}
+      onInsertCode={insertCodeCell}
+    />
   )}
       {/* ==================================================
           UPLOAD ERROR

@@ -20,7 +20,16 @@ from intelligence.dataset import (
 )
 from debugger.ml_mistake_detector import analyze_ml_mistakes
 from debugger.code_explainer import explain_code
-
+from intelligence.preprocessing_advisor import (
+    analyze_preprocessing,
+)
+from intelligence.preprocessing_preview import (
+    preview_preprocessing,
+)
+from intelligence.preprocessing_apply import (
+    apply_preprocessing,
+    undo_preprocessing,
+)
 app = FastAPI(
     title="ModelMind Backend",
     version="0.3.0",
@@ -59,6 +68,14 @@ class MLMistakeRequest(BaseModel):
 class CodeExplainRequest(BaseModel):
     code: str = Field(max_length=50000)
     level: str = "Basic"
+    
+class PreprocessingPreviewRequest(BaseModel):
+    feature: str
+    strategy: str
+    
+class PreprocessingApplyRequest(BaseModel):
+    feature: str
+    strategy: str
 
 
 # ==========================================
@@ -443,7 +460,192 @@ def feature_intelligence(
                 f"{str(error)}"
             ),
         )
+# =========================================================
+# SMART PREPROCESSING ADVISOR
+# =========================================================
 
+@app.get(
+    "/runtime/{session_id}/dataset/{filename}/preprocessing"
+)
+def preprocessing_intelligence(
+    session_id: str,
+    filename: str,
+    level: str = "Basic",
+):
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    safe_name = safe_filename(
+        filename
+    )
+
+    path = (
+        session.workspace
+        / safe_name
+    )
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found.",
+        )
+
+    try:
+        return analyze_preprocessing(
+            path=path,
+            level=level,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Preprocessing analysis failed: "
+                f"{str(error)}"
+            ),
+        )
+        
+# =========================================================
+# PREPROCESSING PREVIEW
+# =========================================================
+
+
+@app.post(
+    "/runtime/{session_id}/dataset/{filename}/preprocessing/preview"
+)
+def preprocessing_preview(
+    session_id: str,
+    filename: str,
+    request: PreprocessingPreviewRequest,
+):
+
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    safe_name = safe_filename(
+        filename
+    )
+
+    path = (
+        session.workspace
+        / safe_name
+    )
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found.",
+        )
+
+    try:
+        return preview_preprocessing(
+            path=path,
+            feature=request.feature,
+            strategy=request.strategy,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Preprocessing preview failed: "
+                f"{str(error)}"
+            ),
+        )
+# =========================================================
+# APPLY PREPROCESSING
+# =========================================================
+
+
+@app.post(
+    "/runtime/{session_id}/dataset/{filename}/preprocessing/apply"
+)
+def preprocessing_apply(
+    session_id: str,
+    filename: str,
+    request: PreprocessingApplyRequest,
+):
+
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    safe_name = safe_filename(
+        filename
+    )
+
+    path = (
+        session.workspace
+        / safe_name
+    )
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found.",
+        )
+
+    try:
+        result = apply_preprocessing(
+            path=path,
+            feature=request.feature,
+            strategy=request.strategy,
+        )
+
+        # Return fresh dataset intelligence so
+        # the frontend can refresh immediately.
+        result["dataset"] = (
+            analyze_dataset(path)
+        )
+
+        return result
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Applying preprocessing failed: "
+                f"{str(error)}"
+            ),
+        )
 # =========================================================
 # ML MISTAKE DETECTOR
 # =========================================================

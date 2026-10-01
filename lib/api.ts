@@ -920,3 +920,347 @@ export async function explainPythonCode(
 
   return response.json();
 }
+/* =========================================================
+   SMART PREPROCESSING ADVISOR
+   ========================================================= */
+
+export interface PreprocessingRecommendation {
+  feature: string;
+
+  feature_type:
+    | "numerical"
+    | "categorical";
+
+  dtype: string | null;
+
+  missing_count: number;
+  missing_percentage: number;
+
+  missing_severity:
+    | "none"
+    | "low"
+    | "moderate"
+    | "high"
+    | "very_high";
+
+  unique_count: number;
+
+  skewness?: number;
+
+  distribution_shape?: string | null;
+
+  outlier_count?: number;
+  outlier_percentage?: number;
+
+  unique_ratio?: number;
+
+  imputation_strategy: string;
+
+  imputation_reason?: string | null;
+
+  scaling_strategy?: string;
+  scaling_reason?: string | null;
+
+  transformation_strategy?: string;
+  transformation_reason?: string | null;
+
+  recommended_action: string;
+  explanation: string;
+  example_code: string;
+
+  warnings: string[];
+}
+
+
+export interface PreprocessingSafety {
+  dataset_modified: boolean;
+  automatic_apply: boolean;
+  message: string;
+}
+
+
+export interface PreprocessingAdvisorResult {
+  handled: boolean;
+
+  source: string;
+
+  engine: string;
+
+  level:
+    | "basic"
+    | "medium"
+    | "advanced";
+
+  filename: string;
+
+  rows: number;
+  columns: number;
+
+  numerical_features: number;
+  categorical_features: number;
+
+  total_missing_values: number;
+
+  duplicate_rows: number;
+
+  feature_warning_count: number;
+
+  dataset_warnings: string[];
+
+  recommendations:
+    PreprocessingRecommendation[];
+
+  safety: PreprocessingSafety;
+}
+
+
+export async function getPreprocessingAdvice(
+  sessionId: string,
+  filename: string,
+  level: ExplanationLevel = "Basic"
+): Promise<PreprocessingAdvisorResult> {
+  const encodedFilename =
+    encodeURIComponent(filename);
+
+  const encodedLevel =
+    encodeURIComponent(level);
+
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/dataset/${encodedFilename}/preprocessing?level=${encodedLevel}`
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Smart preprocessing analysis failed."
+    );
+  }
+
+  return response.json();
+}
+// ============================================================
+// PREPROCESSING PREVIEW
+// ============================================================
+
+export interface PreprocessingPreviewStatistics {
+  missing_count: number;
+  missing_percentage: number;
+
+  // Numerical statistics
+  mean?: number | null;
+  median?: number | null;
+  std?: number | null;
+  min?: number | null;
+  max?: number | null;
+
+  // Categorical statistics
+  unique_count?: number;
+  most_frequent_value?: string | number | boolean | null;
+}
+
+export interface PreprocessingPreviewSide {
+  sample: Array<string | number | boolean | null>;
+  statistics: PreprocessingPreviewStatistics;
+}
+
+export interface PreprocessingPreviewSafety {
+  preview_only: boolean;
+  dataset_modified: boolean;
+  written_to_disk: boolean;
+  message: string;
+}
+
+export interface PreprocessingPreviewResult {
+  handled: boolean;
+  source: string;
+  engine: string;
+
+  filename: string;
+
+  feature: string;
+
+  feature_type:
+    | "numerical"
+    | "categorical";
+
+  strategy: string;
+
+  fill_value:
+    | string
+    | number
+    | boolean
+    | null;
+
+  changed_count: number;
+
+  explanation: string;
+
+  before: PreprocessingPreviewSide;
+  after: PreprocessingPreviewSide;
+
+  safety: PreprocessingPreviewSafety;
+}
+
+
+export async function previewPreprocessing(
+  sessionId: string,
+  filename: string,
+  feature: string,
+  strategy: string
+): Promise<PreprocessingPreviewResult> {
+
+  const encodedFilename =
+    encodeURIComponent(filename);
+
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/dataset/${encodedFilename}/preprocessing/preview`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body: JSON.stringify({
+        feature,
+        strategy,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Preprocessing preview failed."
+    );
+  }
+
+  return response.json();
+}
+// ============================================================
+// PREPROCESSING APPLY + UNDO
+// ============================================================
+
+export interface PreprocessingApplyResult {
+  handled: boolean;
+  source: string;
+  engine: string;
+
+  filename: string;
+  feature: string;
+  strategy: string;
+
+  fill_value?: string | number | boolean | null;
+
+  applied: boolean;
+  changed_count: number;
+
+  missing_before?: number;
+  missing_after?: number;
+
+  backup_created?: boolean;
+  backup_filename?: string;
+
+  message: string;
+
+  dataset?: unknown;
+}
+
+
+export interface PreprocessingUndoResult {
+  handled: boolean;
+  source: string;
+  engine: string;
+
+  filename: string;
+
+  restored: boolean;
+
+  backup_filename: string;
+
+  message: string;
+
+  dataset?: unknown;
+}
+
+
+export async function applyPreprocessing(
+  sessionId: string,
+  filename: string,
+  feature: string,
+  strategy: string
+): Promise<PreprocessingApplyResult> {
+
+  const encodedFilename =
+    encodeURIComponent(filename);
+
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/dataset/${encodedFilename}/preprocessing/apply`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body: JSON.stringify({
+        feature,
+        strategy,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Applying preprocessing failed."
+    );
+  }
+
+  return response.json();
+}
+
+
+export async function undoPreprocessing(
+  sessionId: string,
+  filename: string
+): Promise<PreprocessingUndoResult> {
+
+  const encodedFilename =
+    encodeURIComponent(filename);
+
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/dataset/${encodedFilename}/preprocessing/undo`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Undo preprocessing failed."
+    );
+  }
+
+  return response.json();
+}
