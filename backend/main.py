@@ -18,7 +18,7 @@ from intelligence.dataset import (
     analyze_target,
     analyze_feature,
 )
-
+from debugger.ml_mistake_detector import analyze_ml_mistakes
 
 app = FastAPI(
     title="ModelMind Backend",
@@ -51,6 +51,9 @@ class DebugRequest(BaseModel):
     code: str = Field(max_length=50000)
     traceback: str = Field(max_length=20000)
     action: str = "explain"
+    level: str = "Basic"
+class MLMistakeRequest(BaseModel):
+    code: str
     level: str = "Basic"
 
 
@@ -437,7 +440,18 @@ def feature_intelligence(
             ),
         )
 
+# =========================================================
+# ML MISTAKE DETECTOR
+# =========================================================
 
+@app.post("/ai/ml-check")
+def check_ml_mistakes(
+    request: MLMistakeRequest,
+):
+    return analyze_ml_mistakes(
+        code=request.code,
+        level=request.level,
+    )
 @app.post("/ai/error")
 def debug_error(
     request: DebugRequest,

@@ -12,6 +12,7 @@ import {
   executePython,
   uploadRuntimeFile,
   UploadResult,
+  analyzeMLMistakes,
 } from "@/lib/api";
 
 interface Props {
@@ -117,47 +118,61 @@ export default function Notebook({
     );
   }
 
-  async function executeCell(
-    id: string,
-    code: string
-  ) {
-    if (!runtimeId) {
-      setCells((previous) =>
-        previous.map((cell) =>
-          cell.id === id
-            ? {
-                ...cell,
-                isRunning: false,
-                error:
-                  "ModelMind runtime is not ready yet.",
-              }
-            : cell
-        )
-      );
-
-      return;
-    }
-
+async function executeCell(
+  id: string,
+  code: string,
+  analysisCode: string = code
+) {
+  if (!runtimeId) {
     setCells((previous) =>
       previous.map((cell) =>
         cell.id === id
           ? {
               ...cell,
-              isRunning: true,
-              output: "",
-              error: "",
+              isRunning: false,
+              error:
+                "ModelMind runtime is not ready yet.",
+              mlAnalysis: null,
+              mlAnalysisError: "",
             }
           : cell
       )
     );
 
-    try {
-      const result =
-        await executePython(
-          runtimeId,
-          code
-        );
+    return;
+  }
 
+  setCells((previous) =>
+    previous.map((cell) =>
+      cell.id === id
+        ? {
+            ...cell,
+            isRunning: true,
+            output: "",
+            error: "",
+            mlAnalysis: null,
+            mlAnalysisError: "",
+          }
+        : cell
+    )
+  );
+
+  try {
+    const result =
+      await executePython(
+        runtimeId,
+        code
+      );
+
+    /*
+     * Runtime errors continue through the
+     * existing ModelMind Error Intelligence
+     * workflow.
+     *
+     * ML methodology analysis only runs when
+     * Python execution succeeds.
+     */
+    if (!result.success) {
       setCells((previous) =>
         previous.map((cell) =>
           cell.id === id
@@ -172,84 +187,203 @@ export default function Notebook({
                   .filter(Boolean)
                   .join("\n"),
 
-                error: result.success
-                  ? ""
-                  : result.error,
+                error: result.error,
+
+                mlAnalysis: null,
+                mlAnalysisError: "",
               }
             : cell
         )
       );
-    } catch (error) {
+
+      return;
+    }
+
+    /*
+     * Preserve successful Python output
+     * immediately.
+     */
+    setCells((previous) =>
+      previous.map((cell) =>
+        cell.id === id
+          ? {
+              ...cell,
+              isRunning: false,
+
+              output: [
+                result.output,
+                result.stderr,
+              ]
+                .filter(Boolean)
+                .join("\n"),
+
+              error: "",
+            }
+          : cell
+      )
+    );
+
+    /*
+     * Run ModelMind's deterministic
+     * ML Mistake Detector.
+     *
+     * A failure in educational analysis
+     * must NEVER turn successful Python
+     * execution into a notebook error.
+     */
+    try {
+      const mlAnalysis =
+  await analyzeMLMistakes(
+    analysisCode,
+    "Basic"
+  );
+
       setCells((previous) =>
         previous.map((cell) =>
           cell.id === id
             ? {
                 ...cell,
-                isRunning: false,
-                output: "",
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "Runtime request failed.",
+                mlAnalysis,
+                mlAnalysisError: "",
+              }
+            : cell
+        )
+      );
+    } catch (analysisError) {
+      setCells((previous) =>
+        previous.map((cell) =>
+          cell.id === id
+            ? {
+                ...cell,
+                mlAnalysis: null,
+                mlAnalysisError:
+                  analysisError instanceof Error
+                    ? analysisError.message
+                    : "ML analysis failed.",
               }
             : cell
         )
       );
     }
-  }
-
-  async function runCell(id: string) {
-    const selected =
-      cells.find(
-        (cell) => cell.id === id
-      );
-
-    if (!selected) return;
-
-    if (
-      selected.type !== "code"
-    ) {
-      return;
-    }
-
-    if (
-      !selected.content.trim()
-    ) {
-      return;
-    }
-
-    await executeCell(
-      selected.id,
-      selected.content
+  } catch (error) {
+    setCells((previous) =>
+      previous.map((cell) =>
+        cell.id === id
+          ? {
+              ...cell,
+              isRunning: false,
+              output: "",
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Runtime request failed.",
+              mlAnalysis: null,
+              mlAnalysisError: "",
+            }
+          : cell
+      )
     );
   }
+}
+  async function runCell(id: string) {
+  const selectedIndex =
+    cells.findIndex(
+      (cell) => cell.id === id
+    );
+
+  if (selectedIndex === -1) {
+    return;
+  }
+
+  const selected =
+    cells[selectedIndex];
+
+  if (selected.type !== "code") {
+    return;
+  }
+
+  if (!selected.content.trim()) {
+    return;
+  }
+
+  /*
+   * Build notebook context ONLY for static
+   * ModelMind analysis.
+   *
+   * We include code cells from the beginning
+   * of the notebook through the current cell.
+   *
+   * This code is NOT executed again.
+   */
+  const analysisCode =
+    cells
+      .slice(0, selectedIndex + 1)
+      .filter(
+        (cell) =>
+          cell.type === "code" &&
+          cell.content.trim()
+      )
+      .map(
+        (cell, index) =>
+          `# ===== ModelMind Cell ${index + 1} =====\n${cell.content}`
+      )
+      .join("\n\n");
+
+  /*
+   * Execute ONLY the selected cell.
+   *
+   * analysisCode is used exclusively by the
+   * static ML Mistake Detector.
+   */
+  await executeCell(
+    selected.id,
+    selected.content,
+    analysisCode
+  );
+}
 
   async function runAllCells() {
-    if (!runtimeId) return;
+  if (!runtimeId) return;
 
-    for (const cell of cells) {
-      if (
-        cell.type === "code" &&
-        cell.content.trim()
-      ) {
-        await executeCell(
-          cell.id,
-          cell.content
-        );
-      }
+  const accumulatedCode: string[] = [];
+
+  for (let index = 0; index < cells.length; index++) {
+    const cell = cells[index];
+
+    if (
+      cell.type !== "code" ||
+      !cell.content.trim()
+    ) {
+      continue;
     }
-  }
 
-  function clearOutputs() {
-    setCells((previous) =>
-      previous.map((cell) => ({
-        ...cell,
-        output: "",
-        error: "",
-        isRunning: false,
-      }))
+    accumulatedCode.push(
+      `# ===== ModelMind Cell ${index + 1} =====\n${cell.content}`
+    );
+
+    const analysisCode =
+      accumulatedCode.join("\n\n");
+
+    await executeCell(
+      cell.id,
+      cell.content,
+      analysisCode
     );
   }
+}
+
+  function clearOutputs() {
+  setCells((previous) =>
+    previous.map((cell) => ({
+      ...cell,
+      output: "",
+      error: "",
+      isRunning: false,
+      mlAnalysis: null,
+      mlAnalysisError: "",
+    }))
+  );
+}
 
   /* ======================================================
      NOTEBOOK FILE / DATASET UPLOAD
@@ -391,11 +525,37 @@ df.head()`;
       );
 
       if (runAfterAccept) {
-        await executeCell(
-          cellId,
-          correctedCode
-        );
-      }
+  const selectedIndex =
+    cells.findIndex(
+      (cell) => cell.id === cellId
+    );
+
+  const analysisCode =
+    cells
+      .slice(
+        0,
+        selectedIndex >= 0
+          ? selectedIndex + 1
+          : cells.length
+      )
+      .filter(
+        (cell) =>
+          cell.type === "code" &&
+          cell.content.trim()
+      )
+      .map((cell) =>
+        cell.id === cellId
+          ? correctedCode
+          : cell.content
+      )
+      .join("\n\n");
+
+  await executeCell(
+    cellId,
+    correctedCode,
+    analysisCode || correctedCode
+  );
+}
     }
 
     window.addEventListener(

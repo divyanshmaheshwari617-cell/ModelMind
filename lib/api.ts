@@ -725,3 +725,79 @@ export async function analyzeDatasetFeature(
 
   return response.json();
 }
+/* =========================================================
+   ML MISTAKE DETECTOR
+   ========================================================= */
+
+export type MLMistakeSeverity =
+  | "critical"
+  | "high"
+  | "warning"
+  | "info";
+
+export interface MLMistakeFinding {
+  id: string;
+  severity: MLMistakeSeverity;
+  confidence: number;
+  category: string;
+  title: string;
+  what_happened: string;
+  why_it_matters: string;
+  recommendation: string;
+  code_example: string;
+  line_number: number | null;
+  learning_level: string;
+  evidence: string;
+  safe_to_apply: boolean;
+  source: string;
+}
+
+export interface MLMistakeResult {
+  handled: boolean;
+  source: string;
+  engine: string;
+  level: string;
+  parse_success: boolean;
+  findings: MLMistakeFinding[];
+  finding_count: number;
+}
+
+export async function analyzeMLMistakes(
+  code: string,
+  level: ExplanationLevel = "Basic"
+): Promise<MLMistakeResult> {
+  const response = await fetch(
+    `${API_URL}/ai/ml-check`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        code,
+        level,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    let message =
+      "ModelMind could not check this ML code.";
+
+    try {
+      const errorData = await response.json();
+
+      if (errorData.detail) {
+        message = errorData.detail;
+      }
+    } catch {
+      // Backend did not return JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}
