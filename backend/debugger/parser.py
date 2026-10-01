@@ -4,6 +4,7 @@ import re
 def parse_traceback(traceback: str) -> dict:
     result = {
         "error_type": "PythonError",
+        "qualified_error_type": "",
         "message": "",
         "line_number": None,
         "failing_line": "",
@@ -12,19 +13,48 @@ def parse_traceback(traceback: str) -> dict:
     if not traceback:
         return result
 
-    # Example:
-    # TypeError: can only concatenate str ...
+    # --------------------------------------------------------
+    # ERROR TYPE + MESSAGE
+    # --------------------------------------------------------
+    #
+    # Supports normal Python exceptions:
+    #
+    # ValueError: invalid value
+    #
+    # And qualified library exceptions:
+    #
+    # sklearn.exceptions.NotFittedError: estimator is not fitted
+    # pandas.errors.ParserError: ...
+    # numpy.exceptions.AxisError: ...
+    #
+    # ModelMind stores:
+    #
+    # error_type            -> NotFittedError
+    # qualified_error_type  -> sklearn.exceptions.NotFittedError
+    #
+
     error_match = re.search(
-        r"^([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception)):\s*(.*)$",
+        r"^((?:[A-Za-z_][A-Za-z0-9_]*\.)*"
+        r"[A-Za-z_][A-Za-z0-9_]*"
+        r"(?:Error|Exception|Warning)):\s*(.*)$",
         traceback,
         re.MULTILINE,
     )
 
     if error_match:
-        result["error_type"] = error_match.group(1)
-        result["message"] = error_match.group(2).strip()
+        qualified_error_type = error_match.group(1)
+        message = error_match.group(2).strip()
 
-    # Find traceback line numbers.
+        error_type = qualified_error_type.split(".")[-1]
+
+        result["error_type"] = error_type
+        result["qualified_error_type"] = qualified_error_type
+        result["message"] = message
+
+    # --------------------------------------------------------
+    # LINE NUMBER
+    # --------------------------------------------------------
+
     line_matches = re.findall(
         r'File ".*?", line (\d+)',
         traceback,
@@ -40,6 +70,7 @@ def get_source_line(
     code: str,
     line_number: int | None,
 ) -> str:
+
     if not line_number:
         return ""
 
