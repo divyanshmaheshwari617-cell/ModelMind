@@ -55,3 +55,5 @@ app.zip
 backend.zip
 components.zip
 lib.zip
+# ModelMind local secrets
+backend/.modelmind/

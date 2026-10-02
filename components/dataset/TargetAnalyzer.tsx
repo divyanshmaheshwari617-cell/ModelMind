@@ -399,9 +399,11 @@ export default function TargetAnalyzer({
               MODEL + METRIC LEARNING
               ================================= */}
 
-          <RecommendationSection
-            task={analysis.task}
-          />
+          <MLPipelineBuilder
+  task={analysis.task}
+  analysis={analysis}
+  dataset={dataset}
+/>
 
           <div
             style={{
@@ -756,42 +758,167 @@ function InfoCard({
    RECOMMENDATIONS
    ========================================================= */
 
-function RecommendationSection({
+/* =========================================================
+   ML PIPELINE BUILDER
+   ========================================================= */
+
+interface PipelineModel {
+  name: string;
+  strengths: string[];
+  cautions: string[];
+}
+
+function MLPipelineBuilder({
   task,
+  analysis,
+  dataset,
 }: {
   task: MLTask;
+  analysis: TargetAnalysis;
+  dataset: DatasetAnalysis;
 }) {
+  const [showModels, setShowModels] =
+    useState(false);
+
+  const [openModel, setOpenModel] =
+    useState<string | null>(null);
+
   if (task === "unknown") {
     return null;
   }
 
-  const classificationModels = [
-    "Logistic Regression",
-    "Decision Tree",
-    "Random Forest",
-    "K-Nearest Neighbors",
-  ];
+  const featureCount = Math.max(
+    dataset.columns - 1,
+    0
+  );
 
-  const regressionModels = [
-    "Linear Regression",
-    "Decision Tree Regressor",
-    "Random Forest Regressor",
-  ];
+  const numericalFeatureCount =
+    dataset.numeric_columns.filter(
+      (column) =>
+        column !== analysis.target
+    ).length;
 
-  const classificationMetrics = [
-    "Accuracy",
-    "Precision",
-    "Recall",
-    "F1 Score",
-    "ROC-AUC",
-  ];
+  const categoricalFeatureCount =
+    dataset.categorical_columns.filter(
+      (column) =>
+        column !== analysis.target
+    ).length;
 
-  const regressionMetrics = [
-    "MAE",
-    "MSE",
-    "RMSE",
-    "R² Score",
-  ];
+  const possibleIdColumns =
+    dataset.likely_id_columns.filter(
+      (column) =>
+        column !== analysis.target
+    );
+
+  const hasMissingValues =
+    dataset.total_missing_values > 0;
+
+  const hasCategoricalFeatures =
+    categoricalFeatureCount > 0;
+
+  const hasPossibleIds =
+    possibleIdColumns.length > 0;
+
+  const classificationModels: PipelineModel[] =
+    [
+      {
+        name: "Logistic Regression",
+        strengths: [
+          "Provides a strong and interpretable classification baseline.",
+          "Works well when the relationship between features and class probability is reasonably simple.",
+          "Produces probabilities that can support metrics such as ROC-AUC.",
+        ],
+        cautions: [
+          "Usually benefits from feature scaling.",
+          "Categorical features must be encoded before training.",
+          "May struggle with strongly nonlinear relationships unless features are engineered.",
+        ],
+      },
+
+      {
+        name: "Decision Tree",
+        strengths: [
+          "Can learn nonlinear decision boundaries.",
+          "Can capture interactions between features.",
+          "Does not normally require feature scaling.",
+        ],
+        cautions: [
+          "A deep tree can overfit the training data.",
+          "Tree depth and other complexity controls should be validated.",
+        ],
+      },
+
+      {
+        name: "Random Forest",
+        strengths: [
+          "Combines many decision trees to learn nonlinear patterns.",
+          "Can capture interactions between multiple features.",
+          "Does not normally require feature scaling.",
+        ],
+        cautions: [
+          "Less interpretable than a single decision tree or logistic regression.",
+          "Training and prediction can require more computation than simpler models.",
+        ],
+      },
+
+      {
+        name: "K-Nearest Neighbors",
+        strengths: [
+          "Provides an intuitive distance-based classification approach.",
+          "Can model nonlinear class boundaries without learning a fixed equation.",
+          "Useful for learning how feature distance affects predictions.",
+        ],
+        cautions: [
+          "Feature scaling is especially important because distance drives predictions.",
+          "Prediction can become slower as the training dataset grows.",
+          "Irrelevant features can distort distance calculations.",
+        ],
+      },
+    ];
+
+  const regressionModels: PipelineModel[] =
+    [
+      {
+        name: "Linear Regression",
+        strengths: [
+          "Provides a simple and interpretable regression baseline.",
+          "Helps you understand how numerical features relate to the predicted value.",
+          "Useful for comparing whether more complex models actually improve performance.",
+        ],
+        cautions: [
+          "Assumes an approximately linear relationship unless features are transformed.",
+          "Can be sensitive to influential outliers.",
+          "Categorical features must be encoded before training.",
+        ],
+      },
+
+      {
+        name: "Decision Tree Regressor",
+        strengths: [
+          "Can learn nonlinear relationships.",
+          "Can automatically capture interactions between features.",
+          "Does not normally require feature scaling.",
+        ],
+        cautions: [
+          "Deep trees can strongly overfit training data.",
+          "Tree complexity should be controlled and evaluated on unseen data.",
+        ],
+      },
+
+      {
+        name: "Random Forest Regressor",
+        strengths: [
+          "Can model complex nonlinear relationships.",
+          "Can capture interactions between many features.",
+          "Does not normally require feature scaling.",
+        ],
+        cautions: [
+          "Less directly interpretable than Linear Regression.",
+          "Uses more computation than a single decision tree.",
+          "Hyperparameters should still be validated rather than chosen from training performance alone.",
+        ],
+      },
+    ];
 
   const models =
     task === "classification"
@@ -800,43 +927,464 @@ function RecommendationSection({
 
   const metrics =
     task === "classification"
-      ? classificationMetrics
-      : regressionMetrics;
+      ? [
+          "Accuracy",
+          "Precision",
+          "Recall",
+          "F1 Score",
+          "ROC-AUC",
+        ]
+      : [
+          "MAE",
+          "MSE",
+          "RMSE",
+          "R² Score",
+        ];
+
+  const pipelineSteps: {
+    title: string;
+    detail: string;
+  }[] = [
+    {
+      title: "Define X and y",
+      detail: `Use ${analysis.target} as the target y and keep the remaining usable columns as model features X.`,
+    },
+
+    ...(hasPossibleIds
+      ? [
+          {
+            title:
+              "Review possible identifier columns",
+            detail: `Check ${possibleIdColumns.join(
+              ", "
+            )}. Identifier columns often identify rows rather than provide generalizable predictive information.`,
+          },
+        ]
+      : []),
+
+    {
+      title: "Create train/test split",
+      detail:
+        "Split the data before fitting learned preprocessing so the test set remains unseen during training.",
+    },
+
+    ...(hasMissingValues
+      ? [
+          {
+            title:
+              "Handle missing values",
+            detail:
+              "Choose suitable imputation strategies and fit learned imputation using training data only.",
+          },
+        ]
+      : []),
+
+    ...(hasCategoricalFeatures
+      ? [
+          {
+            title:
+              "Encode categorical features",
+            detail:
+              "Convert categorical features into a numerical representation that the selected model can use.",
+          },
+        ]
+      : []),
+
+    {
+      title:
+        "Scale features when required",
+      detail:
+        "Distance-based and many linear models benefit from scaling. Tree-based models usually do not require it.",
+    },
+
+    {
+      title: "Create the model",
+      detail:
+        "Choose a model as an experiment rather than assuming one algorithm will always perform best.",
+    },
+
+    {
+      title: "Train on training data",
+      detail:
+        "Fit preprocessing and the estimator using the training partition only.",
+    },
+
+    {
+      title: "Predict unseen data",
+      detail:
+        "Use the trained pipeline to generate predictions for the held-out test data.",
+    },
+
+    {
+      title: "Evaluate the model",
+      detail:
+        task === "classification"
+          ? "Use classification metrics that match the target distribution and the cost of different mistakes."
+          : "Use regression metrics to measure prediction error and how well predictions explain target variation.",
+    },
+  ];
 
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns:
-          "repeat(auto-fit, minmax(200px, 1fr))",
-        gap: "10px",
+        marginTop: "18px",
+        padding: "15px",
+        borderRadius: "10px",
+        border:
+          "1px solid rgba(100,160,255,0.16)",
+        background:
+          "rgba(100,160,255,0.035)",
       }}
     >
-      <RecommendationCard
-        title="🤖 Models to Explore"
-        values={models}
-      />
+      {/* HEADER */}
 
-      <RecommendationCard
-        title="📊 Metrics to Learn"
-        values={metrics}
-      />
+      <div
+        style={{
+          marginBottom: "16px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "15px",
+            fontWeight: 700,
+          }}
+        >
+          ⚙ ML Pipeline Builder
+        </div>
+
+        <div
+          style={{
+            marginTop: "4px",
+            fontSize: "11px",
+            lineHeight: 1.6,
+            opacity: 0.62,
+          }}
+        >
+          ModelMind is planning an
+          educational machine-learning
+          workflow for this dataset. Nothing
+          is trained or changed automatically.
+        </div>
+      </div>
+
+      {/* DATASET UNDERSTANDING */}
+
+      <PipelineSectionTitle>
+        Dataset Understanding
+      </PipelineSectionTitle>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(130px, 1fr))",
+          gap: "8px",
+          marginBottom: "16px",
+        }}
+      >
+        <PipelineStat
+          label="Rows"
+          value={String(dataset.rows)}
+        />
+
+        <PipelineStat
+          label="Features"
+          value={String(featureCount)}
+        />
+
+        <PipelineStat
+          label="Numerical"
+          value={String(
+            numericalFeatureCount
+          )}
+        />
+
+        <PipelineStat
+          label="Categorical"
+          value={String(
+            categoricalFeatureCount
+          )}
+        />
+
+        <PipelineStat
+          label="Missing Values"
+          value={String(
+            dataset.total_missing_values
+          )}
+        />
+
+        <PipelineStat
+          label="Possible IDs"
+          value={String(
+            possibleIdColumns.length
+          )}
+        />
+      </div>
+
+      {/* TASK */}
+
+      <PipelineSectionTitle>
+        Detected Task
+      </PipelineSectionTitle>
+
+      <div
+        style={{
+          padding: "11px 12px",
+          borderRadius: "8px",
+          border:
+            "1px solid rgba(255,255,255,0.08)",
+          background:
+            "rgba(255,255,255,0.025)",
+          marginBottom: "16px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+          }}
+        >
+          {analysis.task_type}
+        </div>
+
+        <div
+          style={{
+            marginTop: "4px",
+            fontSize: "11px",
+            opacity: 0.62,
+          }}
+        >
+          Target:{" "}
+          <strong>
+            {analysis.target}
+          </strong>
+        </div>
+      </div>
+
+      {/* PIPELINE PLAN */}
+
+      <PipelineSectionTitle>
+        Your Pipeline Plan
+      </PipelineSectionTitle>
+
+      <div
+        style={{
+          display: "grid",
+          gap: "8px",
+          marginBottom: "18px",
+        }}
+      >
+        {pipelineSteps.map(
+          (step, index) => (
+            <PipelineStep
+              key={step.title}
+              number={index + 1}
+              title={step.title}
+              detail={step.detail}
+            />
+          )
+        )}
+      </div>
+
+      {/* MODEL RECOMMENDATIONS */}
+
+      <div
+        style={{
+          paddingTop: "14px",
+          borderTop:
+            "1px solid rgba(255,255,255,0.07)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setShowModels(
+              (previous) => !previous
+            );
+
+            setOpenModel(null);
+          }}
+          style={{
+            padding: "8px 12px",
+            borderRadius: "7px",
+            border:
+              "1px solid rgba(100,160,255,0.24)",
+            background:
+              "rgba(100,160,255,0.08)",
+            color: "inherit",
+            fontSize: "11px",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          {showModels
+            ? "Hide Recommended Models"
+            : "Show Recommended Models"}
+        </button>
+
+        {showModels && (
+          <div
+            style={{
+              marginTop: "14px",
+            }}
+          >
+            <PipelineSectionTitle>
+              Models Worth Exploring
+            </PipelineSectionTitle>
+
+            <div
+              style={{
+                display: "grid",
+                gap: "9px",
+              }}
+            >
+              {models.map((model) => (
+                <PipelineModelCard
+                  key={model.name}
+                  model={model}
+                  isOpen={
+                    openModel ===
+                    model.name
+                  }
+                  onToggle={() =>
+                    setOpenModel(
+                      openModel ===
+                        model.name
+                        ? null
+                        : model.name
+                    )
+                  }
+                />
+              ))}
+            </div>
+
+            <div
+              style={{
+                marginTop: "16px",
+              }}
+            >
+              <PipelineSectionTitle>
+                Metrics to Learn
+              </PipelineSectionTitle>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "7px",
+                }}
+              >
+                {metrics.map(
+                  (metric) => (
+                    <span
+                      key={metric}
+                      style={{
+                        padding:
+                          "6px 9px",
+                        borderRadius:
+                          "6px",
+                        border:
+                          "1px solid rgba(255,255,255,0.08)",
+                        background:
+                          "rgba(255,255,255,0.025)",
+                        fontSize:
+                          "11px",
+                        opacity: 0.78,
+                      }}
+                    >
+                      {metric}
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* BUILD BUTTON */}
+
+      <div
+        style={{
+          marginTop: "18px",
+          paddingTop: "14px",
+          borderTop:
+            "1px solid rgba(255,255,255,0.07)",
+        }}
+      >
+        <button
+          type="button"
+          disabled
+          title="Pipeline code generation arrives in Batch 9B."
+          style={{
+            padding: "9px 13px",
+            borderRadius: "7px",
+            border:
+              "1px solid rgba(114,226,138,0.18)",
+            background:
+              "rgba(114,226,138,0.06)",
+            color: "inherit",
+            fontSize: "11px",
+            fontWeight: 700,
+            opacity: 0.55,
+            cursor: "not-allowed",
+          }}
+        >
+          Build Learning Pipeline
+        </button>
+
+        <div
+          style={{
+            marginTop: "6px",
+            fontSize: "10px",
+            lineHeight: 1.5,
+            opacity: 0.5,
+          }}
+        >
+          Planning only in Batch 9A.
+          ModelMind will not train a model
+          or modify your dataset.
+        </div>
+      </div>
     </div>
   );
 }
 
 
-function RecommendationCard({
-  title,
-  values,
+/* =========================================================
+   PIPELINE BUILDER SMALL COMPONENTS
+   ========================================================= */
+
+function PipelineSectionTitle({
+  children,
 }: {
-  title: string;
-  values: string[];
+  children: React.ReactNode;
 }) {
   return (
     <div
       style={{
-        padding: "12px",
+        fontSize: "12px",
+        fontWeight: 700,
+        marginBottom: "9px",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+
+function PipelineStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div
+      style={{
+        padding: "10px",
         borderRadius: "8px",
         border:
           "1px solid rgba(255,255,255,0.08)",
@@ -846,32 +1394,217 @@ function RecommendationCard({
     >
       <div
         style={{
-          fontSize: "12px",
+          fontSize: "14px",
           fontWeight: 700,
-          marginBottom: "9px",
         }}
       >
-        {title}
+        {value}
       </div>
 
       <div
         style={{
-          display: "grid",
-          gap: "6px",
+          marginTop: "3px",
+          fontSize: "10px",
+          opacity: 0.55,
         }}
       >
-        {values.map((value) => (
+        {label}
+      </div>
+    </div>
+  );
+}
+
+
+function PipelineStep({
+  number,
+  title,
+  detail,
+}: {
+  number: number;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "10px",
+        alignItems: "flex-start",
+        padding: "10px",
+        borderRadius: "8px",
+        border:
+          "1px solid rgba(255,255,255,0.07)",
+        background:
+          "rgba(255,255,255,0.02)",
+      }}
+    >
+      <div
+        style={{
+          minWidth: "24px",
+          height: "24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: "50%",
+          background:
+            "rgba(100,160,255,0.10)",
+          fontSize: "10px",
+          fontWeight: 700,
+        }}
+      >
+        {number}
+      </div>
+
+      <div>
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 700,
+          }}
+        >
+          ✓ {title}
+        </div>
+
+        <div
+          style={{
+            marginTop: "3px",
+            fontSize: "10px",
+            lineHeight: 1.55,
+            opacity: 0.58,
+          }}
+        >
+          {detail}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function PipelineModelCard({
+  model,
+  isOpen,
+  onToggle,
+}: {
+  model: PipelineModel;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      style={{
+        padding: "11px",
+        borderRadius: "8px",
+        border:
+          "1px solid rgba(255,255,255,0.08)",
+        background:
+          "rgba(255,255,255,0.025)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent:
+            "space-between",
+          alignItems: "center",
+          gap: "10px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "12px",
+            fontWeight: 700,
+          }}
+        >
+          {model.name}
+        </div>
+
+        <button
+          type="button"
+          onClick={onToggle}
+          style={{
+            padding: "5px 8px",
+            borderRadius: "6px",
+            border:
+              "1px solid rgba(255,255,255,0.10)",
+            background:
+              "rgba(255,255,255,0.04)",
+            color: "inherit",
+            fontSize: "10px",
+            cursor: "pointer",
+          }}
+        >
+          {isOpen
+            ? "Hide reason"
+            : "Why this model?"}
+        </button>
+      </div>
+
+      {isOpen && (
+        <div
+          style={{
+            marginTop: "10px",
+            paddingTop: "10px",
+            borderTop:
+              "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
           <div
-            key={value}
             style={{
-              fontSize: "11px",
-              opacity: 0.72,
+              display: "grid",
+              gap: "5px",
+              fontSize: "10px",
+              lineHeight: 1.55,
             }}
           >
-            • {value}
+            {model.strengths.map(
+              (strength) => (
+                <div
+                  key={strength}
+                  style={{
+                    opacity: 0.78,
+                  }}
+                >
+                  ✓ {strength}
+                </div>
+              )
+            )}
           </div>
-        ))}
-      </div>
+
+          <div
+            style={{
+              marginTop: "9px",
+              marginBottom: "5px",
+              fontSize: "10px",
+              fontWeight: 700,
+            }}
+          >
+            Things to know
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gap: "5px",
+              fontSize: "10px",
+              lineHeight: 1.55,
+            }}
+          >
+            {model.cautions.map(
+              (caution) => (
+                <div
+                  key={caution}
+                  style={{
+                    opacity: 0.65,
+                  }}
+                >
+                  ⚠ {caution}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

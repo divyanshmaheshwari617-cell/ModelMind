@@ -1,19 +1,14 @@
-"use client";
+﻿"use client";
 
 import { DatasetAnalysis } from "@/lib/api";
-
 import TargetAnalyzer from "./TargetAnalyzer";
 import FeatureAnalyzer from "./FeatureAnalyzer";
-
-
 interface Props {
   dataset: DatasetAnalysis;
   runtimeId: string;
   filename: string;
   onClose: () => void;
 }
-
-
 export default function DatasetXRay({
   dataset,
   runtimeId,
@@ -35,7 +30,6 @@ export default function DatasetXRay({
 
   const hasPossibleIds =
     dataset.likely_id_columns.length > 0;
-
 
   return (
     <div
@@ -66,7 +60,7 @@ export default function DatasetXRay({
               fontWeight: 700,
             }}
           >
-            🔬 Dataset X-Ray
+            ðŸ”¬ Dataset X-Ray
           </div>
 
           <div
@@ -98,7 +92,6 @@ export default function DatasetXRay({
           Close
         </button>
       </div>
-
 
       {/* =====================================
           DATASET HEALTH
@@ -152,7 +145,6 @@ export default function DatasetXRay({
           />
         </div>
       </div>
-
 
       {/* =====================================
           FEATURE TYPES
@@ -219,7 +211,8 @@ export default function DatasetXRay({
                     dataset.dtypes[column]
                   }
                   style={{
-                    padding: "5px 8px",
+                    padding:
+                      "5px 8px",
                     borderRadius: "6px",
                     fontSize: "11px",
                     border:
@@ -250,7 +243,6 @@ export default function DatasetXRay({
         </div>
       </div>
 
-
       {/* =====================================
           SMART WARNINGS
           ===================================== */}
@@ -274,7 +266,7 @@ export default function DatasetXRay({
           !hasDuplicates &&
           !hasPossibleIds && (
             <InfoBox
-              title="✓ No obvious structural problems"
+              title="âœ“ No obvious structural problems"
               text="ModelMind did not detect missing values, duplicate rows, or obvious ID columns in this first scan."
               type="good"
             />
@@ -282,7 +274,7 @@ export default function DatasetXRay({
 
         {hasMissing && (
           <InfoBox
-            title={`⚠ ${dataset.total_missing_values} missing values detected`}
+            title={`âš  ${dataset.total_missing_values} missing values detected`}
             text="Missing data can affect model training. You may need to remove rows, fill missing values, or use an imputation strategy."
             type="warning"
           />
@@ -290,7 +282,7 @@ export default function DatasetXRay({
 
         {hasDuplicates && (
           <InfoBox
-            title={`⚠ ${dataset.duplicate_rows} duplicate rows detected`}
+            title={`âš  ${dataset.duplicate_rows} duplicate rows detected`}
             text="Duplicate records can give repeated observations extra influence during model training. Check whether these duplicates are intentional."
             type="warning"
           />
@@ -298,7 +290,7 @@ export default function DatasetXRay({
 
         {hasPossibleIds && (
           <InfoBox
-            title="⚠ Possible identifier column"
+            title="âš  Possible identifier column"
             text={`ModelMind detected: ${dataset.likely_id_columns.join(
               ", "
             )}. Identifier columns often identify individual records rather than describe useful predictive patterns.`}
@@ -306,7 +298,6 @@ export default function DatasetXRay({
           />
         )}
       </div>
-
 
       {/* =====================================
           MISSING VALUES
@@ -374,7 +365,7 @@ export default function DatasetXRay({
                       }}
                     >
                       {count} missing
-                      {" · "}
+                      {" Â· "}
                       {percentage}%
                     </span>
                   </div>
@@ -385,9 +376,8 @@ export default function DatasetXRay({
         </div>
       )}
 
-
       {/* =====================================
-          MODELMIND EXPLANATION
+          BEGINNER EXPLANATION
           ===================================== */}
 
       <div
@@ -402,7 +392,7 @@ export default function DatasetXRay({
             marginBottom: "10px",
           }}
         >
-          🧠 ModelMind Explanation
+          ðŸ§  ModelMind Explanation
         </div>
 
         <div
@@ -471,7 +461,6 @@ export default function DatasetXRay({
         </div>
       </div>
 
-
       {/* =====================================
           RECOMMENDED NEXT STEPS
           ===================================== */}
@@ -484,7 +473,7 @@ export default function DatasetXRay({
             marginBottom: "10px",
           }}
         >
-          💡 Recommended Next Steps
+          ðŸ’¡ Recommended Next Steps
         </div>
 
         <div
@@ -540,30 +529,28 @@ export default function DatasetXRay({
           />
         </div>
       </div>
-
-
       {/* =====================================
-          TARGET ANALYZER
-          ===================================== */}
+    TARGET ANALYZER
+    ===================================== */}
 
-      <TargetAnalyzer
-        dataset={dataset}
-        runtimeId={runtimeId}
-        filename={filename}
-      />
+<TargetAnalyzer
+  dataset={dataset}
+  runtimeId={runtimeId}
+  filename={filename}
+/>
+{/* =========================================
+    FEATURE ANALYZER
+    ========================================= */}
 
-
-      {/* =====================================
-          FEATURE ANALYZER
-          ===================================== */}
-
-      <FeatureAnalyzer
-        dataset={dataset}
-        runtimeId={runtimeId}
-        filename={filename}
-      />
+<FeatureAnalyzer
+  dataset={dataset}
+  runtimeId={runtimeId}
+  filename={filename}
+/>
     </div>
   );
+
+
 }
 
 

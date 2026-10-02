@@ -1,0 +1,1977 @@
+﻿===== DatasetXRay.tsx =====
+"use client";
+
+import { DatasetAnalysis } from "@/lib/api";
+import TargetAnalyzer from "./TargetAnalyzer";
+import FeatureAnalyzer from "./FeatureAnalyzer";
+interface Props {
+  dataset: DatasetAnalysis;
+  runtimeId: string;
+  filename: string;
+  onClose: () => void;
+}
+export default function DatasetXRay({
+  dataset,
+  runtimeId,
+  filename,
+  onClose,
+}: Props) {
+  const missingColumns =
+    Object.entries(
+      dataset.missing_values
+    ).sort(
+      (a, b) => b[1] - a[1]
+    );
+
+  const hasMissing =
+    dataset.total_missing_values > 0;
+
+  const hasDuplicates =
+    dataset.duplicate_rows > 0;
+
+  const hasPossibleIds =
+    dataset.likely_id_columns.length > 0;
+
+  return (
+    <div
+      style={{
+        marginTop: "16px",
+        borderTop:
+          "1px solid rgba(255,255,255,0.08)",
+        padding: "18px 16px",
+      }}
+    >
+      {/* =====================================
+          HEADER
+          ===================================== */}
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "12px",
+          marginBottom: "18px",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: "17px",
+              fontWeight: 700,
+            }}
+          >
+            ðŸ”¬ Dataset X-Ray
+          </div>
+
+          <div
+            style={{
+              marginTop: "4px",
+              fontSize: "12px",
+              opacity: 0.6,
+            }}
+          >
+            ModelMind analysis of{" "}
+            {dataset.filename}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            border:
+              "1px solid rgba(255,255,255,0.12)",
+            background:
+              "rgba(255,255,255,0.05)",
+            color: "inherit",
+            borderRadius: "7px",
+            padding: "6px 10px",
+            cursor: "pointer",
+          }}
+        >
+          Close
+        </button>
+      </div>
+
+      {/* =====================================
+          DATASET HEALTH
+          ===================================== */}
+
+      <div
+        style={{
+          marginBottom: "20px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+            marginBottom: "10px",
+          }}
+        >
+          Dataset Health
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(120px, 1fr))",
+            gap: "10px",
+          }}
+        >
+          <MetricCard
+            label="Rows"
+            value={dataset.rows}
+          />
+
+          <MetricCard
+            label="Columns"
+            value={dataset.columns}
+          />
+
+          <MetricCard
+            label="Missing"
+            value={
+              dataset.total_missing_values
+            }
+          />
+
+          <MetricCard
+            label="Duplicates"
+            value={
+              dataset.duplicate_rows
+            }
+          />
+        </div>
+      </div>
+
+      {/* =====================================
+          FEATURE TYPES
+          ===================================== */}
+
+      <div
+        style={{
+          marginBottom: "20px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+            marginBottom: "10px",
+          }}
+        >
+          Feature Types
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: "10px",
+          }}
+        >
+          <MetricCard
+            label="Numerical"
+            value={
+              dataset.numeric_columns.length
+            }
+          />
+
+          <MetricCard
+            label="Categorical"
+            value={
+              dataset
+                .categorical_columns.length
+            }
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop: "12px",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "7px",
+          }}
+        >
+          {dataset.column_names.map(
+            (column) => {
+              const isNumeric =
+                dataset.numeric_columns.includes(
+                  column
+                );
+
+              return (
+                <span
+                  key={column}
+                  title={
+                    dataset.dtypes[column]
+                  }
+                  style={{
+                    padding:
+                      "5px 8px",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    border:
+                      "1px solid rgba(255,255,255,0.08)",
+                    background: isNumeric
+                      ? "rgba(100,160,255,0.08)"
+                      : "rgba(190,120,255,0.08)",
+                  }}
+                >
+                  {column}
+
+                  <span
+                    style={{
+                      opacity: 0.5,
+                      marginLeft: "5px",
+                    }}
+                  >
+                    {
+                      dataset.dtypes[
+                        column
+                      ]
+                    }
+                  </span>
+                </span>
+              );
+            }
+          )}
+        </div>
+      </div>
+
+      {/* =====================================
+          SMART WARNINGS
+          ===================================== */}
+
+      <div
+        style={{
+          marginBottom: "20px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+            marginBottom: "10px",
+          }}
+        >
+          Smart Warnings
+        </div>
+
+        {!hasMissing &&
+          !hasDuplicates &&
+          !hasPossibleIds && (
+            <InfoBox
+              title="âœ“ No obvious structural problems"
+              text="ModelMind did not detect missing values, duplicate rows, or obvious ID columns in this first scan."
+              type="good"
+            />
+          )}
+
+        {hasMissing && (
+          <InfoBox
+            title={`âš  ${dataset.total_missing_values} missing values detected`}
+            text="Missing data can affect model training. You may need to remove rows, fill missing values, or use an imputation strategy."
+            type="warning"
+          />
+        )}
+
+        {hasDuplicates && (
+          <InfoBox
+            title={`âš  ${dataset.duplicate_rows} duplicate rows detected`}
+            text="Duplicate records can give repeated observations extra influence during model training. Check whether these duplicates are intentional."
+            type="warning"
+          />
+        )}
+
+        {hasPossibleIds && (
+          <InfoBox
+            title="âš  Possible identifier column"
+            text={`ModelMind detected: ${dataset.likely_id_columns.join(
+              ", "
+            )}. Identifier columns often identify individual records rather than describe useful predictive patterns.`}
+            type="warning"
+          />
+        )}
+      </div>
+
+      {/* =====================================
+          MISSING VALUES
+          ===================================== */}
+
+      {hasMissing && (
+        <div
+          style={{
+            marginBottom: "20px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "13px",
+              fontWeight: 700,
+              marginBottom: "10px",
+            }}
+          >
+            Missing Values by Column
+          </div>
+
+          <div
+            style={{
+              border:
+                "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "8px",
+              overflow: "hidden",
+            }}
+          >
+            {missingColumns.map(
+              ([column, count]) => {
+                const percentage =
+                  dataset.rows > 0
+                    ? (
+                        (count /
+                          dataset.rows) *
+                        100
+                      ).toFixed(1)
+                    : "0.0";
+
+                return (
+                  <div
+                    key={column}
+                    style={{
+                      display: "flex",
+                      justifyContent:
+                        "space-between",
+                      alignItems:
+                        "center",
+                      gap: "12px",
+                      padding:
+                        "9px 12px",
+                      borderBottom:
+                        "1px solid rgba(255,255,255,0.05)",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <span>
+                      {column}
+                    </span>
+
+                    <span
+                      style={{
+                        opacity: 0.65,
+                      }}
+                    >
+                      {count} missing
+                      {" Â· "}
+                      {percentage}%
+                    </span>
+                  </div>
+                );
+              }
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =====================================
+          BEGINNER EXPLANATION
+          ===================================== */}
+
+      <div
+        style={{
+          marginBottom: "20px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+            marginBottom: "10px",
+          }}
+        >
+          ðŸ§  ModelMind Explanation
+        </div>
+
+        <div
+          style={{
+            padding: "13px",
+            borderRadius: "8px",
+            border:
+              "1px solid rgba(100,160,255,0.14)",
+            background:
+              "rgba(100,160,255,0.05)",
+            fontSize: "12px",
+            lineHeight: 1.7,
+            opacity: 0.9,
+          }}
+        >
+          Your dataset contains{" "}
+          <strong>
+            {
+              dataset.numeric_columns
+                .length
+            }
+          </strong>{" "}
+          numerical features and{" "}
+          <strong>
+            {
+              dataset
+                .categorical_columns
+                .length
+            }
+          </strong>{" "}
+          categorical features.
+
+          {dataset
+            .categorical_columns
+            .length > 0 && (
+            <>
+              {" "}
+              Categorical features
+              usually need to be
+              converted into numerical
+              form before many machine
+              learning algorithms can
+              use them.
+            </>
+          )}
+
+          {hasMissing && (
+            <>
+              {" "}
+              Your dataset also
+              contains missing values,
+              so you should decide how
+              to handle them before
+              training.
+            </>
+          )}
+
+          {hasPossibleIds && (
+            <>
+              {" "}
+              Review the detected ID
+              columns before using them
+              as model features.
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* =====================================
+          RECOMMENDED NEXT STEPS
+          ===================================== */}
+
+      <div>
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+            marginBottom: "10px",
+          }}
+        >
+          ðŸ’¡ Recommended Next Steps
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gap: "7px",
+            fontSize: "12px",
+          }}
+        >
+          {hasMissing && (
+            <Step
+              number={1}
+              text="Handle missing values."
+            />
+          )}
+
+          {hasDuplicates && (
+            <Step
+              number={2}
+              text="Review duplicate rows."
+            />
+          )}
+
+          {hasPossibleIds && (
+            <Step
+              number={3}
+              text="Decide whether ID columns should be removed from model features."
+            />
+          )}
+
+          <Step
+            number={4}
+            text="Choose the column you want the model to predict."
+          />
+
+          {dataset
+            .categorical_columns
+            .length > 0 && (
+            <Step
+              number={5}
+              text="Encode categorical features before training models that require numerical input."
+            />
+          )}
+
+          <Step
+            number={6}
+            text="Explore feature distributions and relationships."
+          />
+
+          <Step
+            number={7}
+            text="Split the dataset into training and testing data."
+          />
+        </div>
+      </div>
+      {/* =====================================
+    TARGET ANALYZER
+    ===================================== */}
+
+<TargetAnalyzer
+  dataset={dataset}
+  runtimeId={runtimeId}
+  filename={filename}
+/>
+{/* =========================================
+    FEATURE ANALYZER
+    ========================================= */}
+
+<FeatureAnalyzer
+  dataset={dataset}
+  runtimeId={runtimeId}
+  filename={filename}
+/>
+    </div>
+  );
+
+
+}
+
+
+/* =========================================================
+   SMALL UI COMPONENTS
+   ========================================================= */
+
+function MetricCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div
+      style={{
+        padding: "12px",
+        borderRadius: "8px",
+        border:
+          "1px solid rgba(255,255,255,0.08)",
+        background:
+          "rgba(255,255,255,0.03)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "18px",
+          fontWeight: 700,
+        }}
+      >
+        {value}
+      </div>
+
+      <div
+        style={{
+          fontSize: "11px",
+          opacity: 0.55,
+          marginTop: "3px",
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+
+function InfoBox({
+  title,
+  text,
+  type,
+}: {
+  title: string;
+  text: string;
+  type: "warning" | "good";
+}) {
+  return (
+    <div
+      style={{
+        padding: "12px",
+        marginBottom: "8px",
+        borderRadius: "8px",
+
+        border:
+          type === "warning"
+            ? "1px solid rgba(255,190,90,0.18)"
+            : "1px solid rgba(114,226,138,0.18)",
+
+        background:
+          type === "warning"
+            ? "rgba(255,190,90,0.05)"
+            : "rgba(114,226,138,0.05)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "12px",
+          fontWeight: 600,
+          marginBottom: "5px",
+        }}
+      >
+        {title}
+      </div>
+
+      <div
+        style={{
+          fontSize: "11px",
+          lineHeight: 1.6,
+          opacity: 0.7,
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
+}
+
+
+function Step({
+  number,
+  text,
+}: {
+  number: number;
+  text: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "9px",
+        alignItems: "flex-start",
+      }}
+    >
+      <span
+        style={{
+          minWidth: "22px",
+          height: "22px",
+          borderRadius: "50%",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background:
+            "rgba(100,160,255,0.10)",
+          fontSize: "10px",
+          fontWeight: 700,
+        }}
+      >
+        {number}
+      </span>
+
+      <span
+        style={{
+          paddingTop: "2px",
+          opacity: 0.8,
+        }}
+      >
+        {text}
+      </span>
+    </div>
+  );
+}
+
+===== PreprocessingGuide.tsx =====
+"use client";
+
+import { FeatureAnalysis } from "@/lib/api";
+
+interface Props {
+  analysis: FeatureAnalysis;
+}
+
+export default function PreprocessingGuide({
+  analysis,
+}: Props) {
+  if (!analysis.is_numeric) {
+    return null;
+  }
+
+  const feature = analysis.feature;
+
+  const imputation =
+    analysis.imputation_strategy;
+
+  const scaling =
+    analysis.scaling_strategy;
+
+  const transformation =
+    analysis.transformation_strategy;
+
+  return (
+    <div
+      style={{
+        marginTop: "14px",
+        padding: "16px",
+        borderRadius: "12px",
+        border:
+          "1px solid rgba(255,255,255,0.08)",
+        background:
+          "rgba(255,255,255,0.02)",
+      }}
+    >
+      {/* HEADER */}
+
+      <div>
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+          }}
+        >
+          ðŸ§ª Preprocessing Guide
+        </div>
+
+        <div
+          style={{
+            marginTop: "5px",
+            fontSize: "10px",
+            opacity: 0.6,
+            lineHeight: 1.6,
+          }}
+        >
+          ModelMind recommends preprocessing
+          steps based on this feature&apos;s
+          distribution and data quality.
+          Nothing is applied automatically.
+        </div>
+      </div>
+
+      {/* =====================================
+          STEP 1 â€” MISSING VALUES
+          ===================================== */}
+
+      <GuideSection
+        step="1"
+        title="Handle Missing Values"
+      >
+        {imputation === "none" ? (
+          <NoAction
+            text="No missing values were detected. Imputation is not currently required."
+          />
+        ) : (
+          <>
+            <Recommendation
+              value={
+                imputation === "mean"
+                  ? "Mean Imputation"
+                  : "Median Imputation"
+              }
+            />
+
+            <Reason>
+              {analysis.imputation_reason ??
+                "Inspect the missing values before choosing an imputation strategy."}
+            </Reason>
+
+            <Steps
+              items={[
+                "Import SimpleImputer from scikit-learn.",
+                `Select the ${feature} feature.`,
+                `Create an imputer using strategy="${
+                  imputation === "mean"
+                    ? "mean"
+                    : "median"
+                }".`,
+                "Fit the imputer using the available values.",
+                "Transform the feature to replace missing values.",
+                "Verify that the missing-value count has decreased as expected.",
+              ]}
+            />
+
+            <CodeBlock
+              code={getImputationCode(
+                feature,
+                imputation
+              )}
+            />
+          </>
+        )}
+      </GuideSection>
+
+      {/* =====================================
+          STEP 2 â€” TRANSFORMATION
+          ===================================== */}
+
+      <GuideSection
+        step="2"
+        title="Check Distribution Transformation"
+      >
+        {transformation === "none" ? (
+          <NoAction
+            text="No strong skewness was detected. A distribution transformation is not currently suggested."
+          />
+        ) : (
+          <>
+            <Recommendation
+              value={
+                transformation ===
+                "log1p_candidate"
+                  ? "Explore log1p"
+                  : "Explore Yeo-Johnson"
+              }
+            />
+
+            <Reason>
+              {analysis.transformation_reason ??
+                "Inspect whether transforming this feature improves its distribution."}
+            </Reason>
+
+            <Warning>
+              This is a candidate transformation,
+              not a mandatory step. Compare the
+              distribution and model performance
+              before deciding to keep it.
+            </Warning>
+
+            <Steps
+              items={
+                transformation ===
+                "log1p_candidate"
+                  ? [
+                      "Inspect the original distribution.",
+                      "Confirm that the feature contains no values below zero.",
+                      "Create a temporary transformed version using np.log1p().",
+                      "Compare the original and transformed distributions.",
+                      "Check the new skewness.",
+                      "Keep the transformation only if it makes sense for the feature and model.",
+                    ]
+                  : [
+                      "Inspect the original distribution.",
+                      "Import PowerTransformer from scikit-learn.",
+                      "Create a Yeo-Johnson transformer.",
+                      "Fit and transform the feature on a temporary copy.",
+                      "Compare the before and after distributions.",
+                      "Keep the transformation only if it is useful for the model.",
+                    ]
+              }
+            />
+
+            <CodeBlock
+              code={getTransformationCode(
+                feature,
+                transformation
+              )}
+            />
+          </>
+        )}
+      </GuideSection>
+
+      {/* =====================================
+          STEP 3 â€” SCALING
+          ===================================== */}
+
+      <GuideSection
+        step="3"
+        title="Consider Feature Scaling"
+      >
+        <Recommendation
+          value={getScalingName(
+            scaling
+          )}
+        />
+
+        <Reason>
+          {analysis.scaling_reason ??
+            "Scaling requirements depend on the machine-learning model you plan to use."}
+        </Reason>
+
+        <Warning>
+          Scaling is model-dependent. For example,
+          distance-based and gradient-based models
+          often benefit from scaling, while many
+          tree-based models generally do not require
+          it.
+        </Warning>
+
+        <Steps
+          items={getScalingSteps(
+            feature,
+            scaling
+          )}
+        />
+
+        <CodeBlock
+          code={getScalingCode(
+            feature,
+            scaling
+          )}
+        />
+      </GuideSection>
+
+      {/* =====================================
+          STEP 4 â€” VERIFY
+          ===================================== */}
+
+      <GuideSection
+        step="4"
+        title="Verify Before Training"
+      >
+        <Steps
+          items={[
+            "Check missing values again.",
+            "Inspect the distribution again.",
+            "Check whether extreme values still need investigation.",
+            "Confirm that preprocessing makes sense for the meaning of the feature.",
+            "Split training and test data correctly before fitting learned preprocessing transformations in a real ML pipeline.",
+            "Evaluate whether preprocessing improves model performance.",
+          ]}
+        />
+
+        <CodeBlock
+          code={`# Verify the feature
+
+print(df["${feature}"].describe())
+
+print(
+    "Missing values:",
+    df["${feature}"].isnull().sum()
+)
+
+print(
+    "Skewness:",
+    df["${feature}"].skew()
+)`}
+        />
+      </GuideSection>
+
+      {/* FINAL NOTE */}
+
+      <div
+        style={{
+          marginTop: "14px",
+          padding: "12px",
+          borderRadius: "8px",
+          background:
+            "rgba(100,160,255,0.04)",
+          border:
+            "1px solid rgba(100,160,255,0.12)",
+          fontSize: "10px",
+          lineHeight: 1.7,
+          opacity: 0.7,
+        }}
+      >
+        ðŸ’¡ <strong>ModelMind rule:</strong>{" "}
+        recommendations explain what you
+        can try. They do not automatically
+        change your dataset. You should
+        understand, preview and validate a
+        preprocessing step before using it.
+      </div>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   GUIDE SECTION
+   ========================================================= */
+
+function GuideSection({
+  step,
+  title,
+  children,
+}: {
+  step: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "14px",
+        padding: "13px",
+        borderRadius: "9px",
+        border:
+          "1px solid rgba(255,255,255,0.07)",
+        background:
+          "rgba(255,255,255,0.018)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        <div
+          style={{
+            width: "23px",
+            height: "23px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background:
+              "rgba(100,160,255,0.12)",
+            fontSize: "10px",
+            fontWeight: 700,
+          }}
+        >
+          {step}
+        </div>
+
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 700,
+          }}
+        >
+          {title}
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: "11px",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   RECOMMENDATION
+   ========================================================= */
+
+function Recommendation({
+  value,
+}: {
+  value: string;
+}) {
+  return (
+    <div
+      style={{
+        fontSize: "11px",
+        fontWeight: 700,
+      }}
+    >
+      Recommended: {value}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   REASON
+   ========================================================= */
+
+function Reason({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "7px",
+        fontSize: "10px",
+        lineHeight: 1.7,
+        opacity: 0.7,
+      }}
+    >
+      <strong>Why?</strong>{" "}
+      {children}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   WARNING / TEACHING NOTE
+   ========================================================= */
+
+function Warning({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "9px",
+        padding: "9px",
+        borderRadius: "7px",
+        background:
+          "rgba(255,190,80,0.04)",
+        border:
+          "1px solid rgba(255,190,80,0.12)",
+        fontSize: "10px",
+        lineHeight: 1.6,
+        opacity: 0.72,
+      }}
+    >
+      âš ï¸ {children}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   NO ACTION
+   ========================================================= */
+
+function NoAction({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div
+      style={{
+        fontSize: "10px",
+        lineHeight: 1.7,
+        opacity: 0.65,
+      }}
+    >
+      âœ… {text}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   STEPS
+   ========================================================= */
+
+function Steps({
+  items,
+}: {
+  items: string[];
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "11px",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "10px",
+          fontWeight: 700,
+          marginBottom: "7px",
+        }}
+      >
+        How to apply
+      </div>
+
+      {items.map(
+        (item, index) => (
+          <div
+            key={index}
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginTop: "6px",
+              fontSize: "10px",
+              lineHeight: 1.55,
+              opacity: 0.7,
+            }}
+          >
+            <span
+              style={{
+                minWidth: "16px",
+                fontWeight: 700,
+              }}
+            >
+              {index + 1}.
+            </span>
+
+            <span>{item}</span>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   CODE BLOCK
+   ========================================================= */
+
+function CodeBlock({
+  code,
+}: {
+  code: string;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "12px",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "9px",
+          opacity: 0.5,
+          marginBottom: "5px",
+        }}
+      >
+        Example Python code
+      </div>
+
+      <pre
+        style={{
+          margin: 0,
+          padding: "11px",
+          borderRadius: "7px",
+          overflowX: "auto",
+          background:
+            "rgba(0,0,0,0.25)",
+          border:
+            "1px solid rgba(255,255,255,0.06)",
+          fontSize: "10px",
+          lineHeight: 1.6,
+        }}
+      >
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   CODE GENERATORS
+   ========================================================= */
+
+function getImputationCode(
+  feature: string,
+  strategy:
+    FeatureAnalysis[
+      "imputation_strategy"
+    ]
+): string {
+  if (strategy === "none") {
+    return `# No imputation is currently required for ${feature}`;
+  }
+
+  const selectedStrategy =
+    strategy === "mean"
+      ? "mean"
+      : "median";
+
+  return `from sklearn.impute import SimpleImputer
+
+imputer = SimpleImputer(
+    strategy="${selectedStrategy}"
+)
+
+df["${feature}"] = imputer.fit_transform(
+    df[["${feature}"]]
+).ravel()
+
+print(
+    df["${feature}"].isnull().sum()
+)`;
+}
+
+
+function getTransformationCode(
+  feature: string,
+  strategy:
+    FeatureAnalysis[
+      "transformation_strategy"
+    ]
+): string {
+  if (
+    strategy === "log1p_candidate"
+  ) {
+    return `import numpy as np
+
+# Create a preview column first.
+# Your original feature remains available.
+
+df["${feature}_log_preview"] = np.log1p(
+    df["${feature}"]
+)
+
+print(
+    df[
+        [
+            "${feature}",
+            "${feature}_log_preview"
+        ]
+    ].head()
+)`;
+  }
+
+  if (
+    strategy ===
+    "power_transform_candidate"
+  ) {
+    return `from sklearn.preprocessing import PowerTransformer
+
+transformer = PowerTransformer(
+    method="yeo-johnson"
+)
+
+df["${feature}_yeojohnson_preview"] = (
+    transformer.fit_transform(
+        df[["${feature}"]]
+    ).ravel()
+)
+
+print(
+    df[
+        [
+            "${feature}",
+            "${feature}_yeojohnson_preview"
+        ]
+    ].head()
+)`;
+  }
+
+  return `# No distribution transformation is currently suggested for ${feature}`;
+}
+
+
+function getScalingName(
+  strategy:
+    FeatureAnalysis[
+      "scaling_strategy"
+    ]
+): string {
+  switch (strategy) {
+    case "standard":
+      return "Consider StandardScaler";
+
+    case "robust":
+      return "Consider RobustScaler";
+
+    case "inspect_after_transform":
+      return "Inspect After Transformation";
+
+    default:
+      return "Choose Based on Model";
+  }
+}
+
+
+function getScalingSteps(
+  feature: string,
+  strategy:
+    FeatureAnalysis[
+      "scaling_strategy"
+    ]
+): string[] {
+  if (strategy === "robust") {
+    return [
+      `Inspect outliers in ${feature}.`,
+      "Check whether your selected ML model benefits from feature scaling.",
+      "Import RobustScaler.",
+      "Fit the scaler using training data only.",
+      "Transform validation/test data using the already-fitted scaler.",
+      "Compare model performance.",
+    ];
+  }
+
+  if (strategy === "standard") {
+    return [
+      `Inspect the distribution of ${feature}.`,
+      "Check whether your selected ML model is sensitive to feature scale.",
+      "Import StandardScaler.",
+      "Fit the scaler using training data only.",
+      "Transform validation/test data using the already-fitted scaler.",
+      "Compare model performance.",
+    ];
+  }
+
+  return [
+    `Inspect the skewness of ${feature}.`,
+    "Preview the suggested transformation first.",
+    "Inspect the transformed distribution.",
+    "Choose a scaler only if your ML model benefits from scaling.",
+    "Fit preprocessing using training data only.",
+    "Compare model performance before keeping the step.",
+  ];
+}
+
+
+function getScalingCode(
+  feature: string,
+  strategy:
+    FeatureAnalysis[
+      "scaling_strategy"
+    ]
+): string {
+  if (strategy === "robust") {
+    return `from sklearn.preprocessing import RobustScaler
+
+scaler = RobustScaler()
+
+df["${feature}_scaled_preview"] = (
+    scaler.fit_transform(
+        df[["${feature}"]]
+    ).ravel()
+)
+
+print(
+    df[
+        [
+            "${feature}",
+            "${feature}_scaled_preview"
+        ]
+    ].head()
+)`;
+  }
+
+  if (strategy === "standard") {
+    return `from sklearn.preprocessing import StandardScaler
+
+scaler = StandardScaler()
+
+df["${feature}_scaled_preview"] = (
+    scaler.fit_transform(
+        df[["${feature}"]]
+    ).ravel()
+)
+
+print(
+    df[
+        [
+            "${feature}",
+            "${feature}_scaled_preview"
+        ]
+    ].head()
+)`;
+  }
+
+  return `# Inspect transformation before choosing
+# the final scaler for ${feature}.
+
+print(
+    df["${feature}"].describe()
+)`;
+}
+
+===== DatasetPanel.tsx =====
+
+===== backend/main.py =====
+from fastapi import (
+    FastAPI,
+    File,
+    HTTPException,
+    UploadFile,
+)
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from debugger.engine import analyze_error
+from runtime.manager import runtime_manager
+from runtime.files import (
+    safe_filename,
+    list_workspace_files,
+)
+from intelligence.dataset import (
+    analyze_dataset,
+    analyze_target,
+    analyze_feature,
+)
+from debugger.ml_mistake_detector import analyze_ml_mistakes
+from debugger.code_explainer import explain_code
+
+app = FastAPI(
+    title="ModelMind Backend",
+    version="0.3.0",
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ==========================================
+# REQUEST MODELS
+# ==========================================
+
+class RuntimeExecuteRequest(BaseModel):
+    session_id: str
+    code: str = Field(max_length=50000)
+
+
+class DebugRequest(BaseModel):
+    code: str = Field(max_length=50000)
+    traceback: str = Field(max_length=20000)
+    action: str = "explain"
+    level: str = "Basic"
+class MLMistakeRequest(BaseModel):
+    code: str
+    level: str = "Basic"
+class CodeExplainRequest(BaseModel):
+    code: str = Field(max_length=50000)
+    level: str = "Basic"
+
+
+# ==========================================
+# BASIC API
+# ==========================================
+
+@app.get("/")
+def home():
+    return {
+        "status": "online",
+        "service": "ModelMind Backend",
+        "runtime": "v2",
+        "debugger": "local",
+    }
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "runtime": "v2",
+    }
+
+
+# ==========================================
+# PERSISTENT NOTEBOOK RUNTIME
+# ==========================================
+
+@app.post("/runtime")
+def create_runtime():
+
+    session = runtime_manager.create_session()
+
+    return {
+        "session_id": session.session_id,
+        "status": "ready",
+    }
+
+
+@app.delete("/runtime/{session_id}")
+def delete_runtime(
+    session_id: str,
+):
+
+    deleted = runtime_manager.delete_session(
+        session_id
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    return {
+        "status": "deleted",
+    }
+
+
+# ==========================================
+# EXECUTE NOTEBOOK CELL
+# ==========================================
+
+@app.post("/execute")
+def execute_code(
+    request: RuntimeExecuteRequest,
+):
+
+    session = runtime_manager.get_session(
+        request.session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Runtime session not found."
+            ),
+        )
+
+    return session.kernel.execute(
+        request.code
+    )
+
+
+# ==========================================
+# RUNTIME VARIABLES
+# ==========================================
+
+@app.get(
+    "/runtime/{session_id}/variables"
+)
+def get_variables(
+    session_id: str,
+):
+
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    return {
+        "variables":
+            session.kernel.variables()
+    }
+
+
+# ==========================================
+# NOTEBOOK FILE / DATASET UPLOAD
+# ==========================================
+
+@app.post(
+    "/runtime/{session_id}/files"
+)
+async def upload_file(
+    session_id: str,
+    file: UploadFile = File(...),
+):
+
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    filename = safe_filename(
+        file.filename or "uploaded_file"
+    )
+
+    destination = (
+        session.workspace / filename
+    )
+
+    content = await file.read()
+
+    # 50 MB development limit
+    if len(content) > (
+        50 * 1024 * 1024
+    ):
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "File exceeds the "
+                "50 MB development limit."
+            ),
+        )
+
+    destination.write_bytes(content)
+
+    response = {
+        "success": True,
+        "filename": filename,
+        "size": len(content),
+    }
+
+    # Automatically inspect datasets
+    if destination.suffix.lower() in {
+        ".csv",
+        ".xlsx",
+        ".xls",
+        ".json",
+    }:
+
+        try:
+            response["dataset"] = (
+                analyze_dataset(
+                    destination
+                )
+            )
+
+        except Exception as error:
+            response["dataset_error"] = (
+                str(error)
+            )
+
+    return response
+
+
+# ==========================================
+# LIST NOTEBOOK FILES
+# ==========================================
+
+@app.get(
+    "/runtime/{session_id}/files"
+)
+def get_files(
+    session_id: str,
+):
+
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    return {
+        "files":
+            list_workspace_files(
+                session.workspace
+            )
+    }
+
+
+# ==========================================
+# DATASET INTELLIGENCE
+# ==========================================
+
+@app.get(
+    "/runtime/{session_id}/dataset/{filename}"
+)
+def dataset_intelligence(
+    session_id: str,
+    filename: str,
+):
+
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    safe_name = safe_filename(
+        filename
+    )
+
+    path = (
+        session.workspace / safe_name
+    )
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found.",
+        )
+
+    try:
+        return analyze_dataset(path)
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+
+# =========================================================
+# TARGET ANALYSIS
+# =========================================================
+
+@app.get(
+    "/runtime/{session_id}/dataset/{filename}/target/{target_column}"
+)
+def target_intelligence(
+    session_id: str,
+    filename: str,
+    target_column: str,
+):
+
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    safe_name = safe_filename(
+        filename
+    )
+
+    path = (
+        session.workspace /
+        safe_name
+    )
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found.",
+        )
+
+    try:
+        return analyze_target(
+            path,
+            target_column,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Target analysis failed: "
+                f"{str(error)}"
+            ),
+        )
+
+
+# ==========================================
+# MODELMIND ERROR DEBUGGER
+# ==========================================
+
+# =========================================================
+# FEATURE INTELLIGENCE
+# =========================================================
+
+@app.get(
+    "/runtime/{session_id}/dataset/{filename}/feature/{feature_column}"
+)
+def feature_intelligence(
+    session_id: str,
+    filename: str,
+    feature_column: str,
+):
+
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    safe_name = safe_filename(
+        filename
+    )
+
+    path = (
+        session.workspace
+        / safe_name
+    )
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found.",
+        )
+
+    try:
+        return analyze_feature(
+            path,
+            feature_column,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Feature analysis failed: "
+                f"{str(error)}"
+            ),
+        )
+
+# =========================================================
+# ML MISTAKE DETECTOR
+# =========================================================
+
+@app.post("/ai/ml-check")
+def check_ml_mistakes(
+    request: MLMistakeRequest,
+):
+    return analyze_ml_mistakes(
+        code=request.code,
+        level=request.level,
+    )
+@app.post("/ai/error")
+def debug_error(
+    request: DebugRequest,
+):
+
+    result = analyze_error(
+        code=request.code,
+        traceback=request.traceback,
+        level=request.level,
+    )
+
+    result["source"] = (
+        "modelmind-local"
+        if result["handled"]
+        else "fallback-required"
+    )
+
+    return result
+# ==========================================
+# CODE EXPLAINER
+# ==========================================
+
+@app.post("/ai/explain-code")
+def explain_python_code(
+    request: CodeExplainRequest,
+):
+    try:
+        return explain_code(
+            code=request.code,
+            level=request.level,
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "ModelMind Code Explainer failed: "
+                f"{str(error)}"
+            ),
+        )

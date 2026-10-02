@@ -1,10 +1,14 @@
 "use client";
 
 import { NotebookCellType } from "@/types/notebook";
+import MissingPackageAssistant from "./MissingPackageAssistant";
 
 interface Props {
+
   cell: NotebookCellType;
   index: number;
+  runtimeId: string | null;
+  runtimeReady: boolean;
   onChange: (id: string, value: string) => void;
   onDelete: (id: string) => void;
   onRun: (id: string) => void;
@@ -17,6 +21,8 @@ interface Props {
 export default function NotebookCell({
   cell,
   index,
+  runtimeId,
+  runtimeReady,
   onChange,
   onDelete,
   onRun,
@@ -105,6 +111,16 @@ export default function NotebookCell({
           </div>
 
           <pre>{cell.error || cell.output}</pre>
+          {cell.error && (
+  <MissingPackageAssistant
+    runtimeId={runtimeId}
+    runtimeReady={runtimeReady}
+    traceback={cell.error}
+    onRunAgain={() =>
+      onRun(cell.id)
+    }
+  />
+)}
 
           {cell.error && (
             <div className="errorActions">

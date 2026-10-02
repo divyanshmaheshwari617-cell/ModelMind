@@ -1,0 +1,2574 @@
+﻿===== lib/api.ts =====
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000";
+
+/* =========================================================
+   MODELMIND PERSISTENT RUNTIME
+   ========================================================= */
+
+export interface RuntimeResult {
+  session_id: string;
+  status: string;
+}
+
+export async function createRuntime(): Promise<RuntimeResult> {
+  const response = await fetch(
+    `${API_URL}/runtime`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Could not create ModelMind runtime."
+    );
+  }
+
+  return response.json();
+}
+
+/* =========================================================
+   PYTHON EXECUTION
+   ========================================================= */
+
+export interface ExecutionResult {
+  success: boolean;
+
+  execution_count: number;
+
+  output: string;
+
+  stderr: string;
+
+  error: string;
+}
+
+export async function executePython(
+  sessionId: string,
+  code: string
+): Promise<ExecutionResult> {
+  try {
+    const response = await fetch(
+      `${API_URL}/execute`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify({
+          session_id: sessionId,
+          code: code,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      let message =
+        "Could not connect to the ModelMind Python Runtime.";
+
+      try {
+        const errorData =
+          await response.json();
+
+        if (errorData.detail) {
+          message =
+            errorData.detail;
+        }
+      } catch {
+        // Backend response was not JSON.
+      }
+
+      throw new Error(message);
+    }
+
+    const data: ExecutionResult =
+      await response.json();
+
+    return data;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error(
+      "ModelMind Python Runtime is unavailable."
+    );
+  }
+}
+
+/* =========================================================
+   MODELMIND DEBUGGER TYPES
+   ========================================================= */
+
+export type ExplanationLevel =
+  | "Basic"
+  | "Medium"
+  | "Advanced";
+
+export type DebugAction =
+  | "explain"
+  | "fix";
+
+export interface AIErrorResult {
+  /*
+   * True when ModelMind's local
+   * debugger understands the error.
+   */
+  handled: boolean;
+
+  /*
+   * Confidence between 0 and 1.
+   */
+  confidence: number;
+
+  /*
+   * Python error type.
+   *
+   * Example:
+   * TypeError
+   * NameError
+   * SyntaxError
+   */
+  error_type: string;
+
+  /*
+   * Human-friendly error title.
+   */
+  title: string;
+
+  /*
+   * Python-reported line number.
+   */
+  line_number: number | null;
+
+  /*
+   * Source line that caused
+   * the problem.
+   */
+  failing_line: string;
+
+  /*
+   * Educational explanation.
+   */
+  explanation: string;
+
+  /*
+   * Root cause.
+   */
+  why: string;
+
+  /*
+   * Instructions for fixing it.
+   */
+  how_to_fix: string;
+
+  /*
+   * Complete corrected code
+   * when ModelMind can generate
+   * a confident fix.
+   */
+  fixed_code: string;
+
+  /*
+   * Explanation of the changes.
+   */
+  changes: string;
+
+  /*
+   * Analysis source.
+   *
+   * modelmind-local
+   * fallback-required
+   * gemini (later)
+   */
+  source: string;
+}
+
+/* =========================================================
+   DEBUG REQUEST
+   ========================================================= */
+
+export async function analyzePythonError(
+  code: string,
+  traceback: string,
+  action: DebugAction,
+  level: ExplanationLevel
+): Promise<AIErrorResult> {
+  try {
+    const response = await fetch(
+      `${API_URL}/ai/error`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify({
+          code,
+          traceback,
+          action,
+          level,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      let message =
+        "ModelMind could not analyze this error.";
+
+      try {
+        const errorData =
+          await response.json();
+
+        if (errorData.detail) {
+          message =
+            errorData.detail;
+        }
+      } catch {
+        // Backend did not return JSON.
+      }
+
+      throw new Error(message);
+    }
+
+    const data: AIErrorResult =
+      await response.json();
+
+    return data;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error(
+      "ModelMind Debugger is currently unavailable."
+    );
+  }
+}
+
+/* =========================================================
+   DEBUGGER HELPER FUNCTIONS
+   ========================================================= */
+
+export function confidenceToPercentage(
+  confidence: number
+): number {
+  return Math.round(
+    confidence * 100
+  );
+}
+
+export function getDebuggerSourceName(
+  source: string
+): string {
+  switch (source) {
+    case "modelmind-local":
+      return "ModelMind Error Engine";
+
+    case "gemini":
+      return "ModelMind AI";
+
+    case "fallback-required":
+      return "Advanced analysis required";
+
+    default:
+      return "ModelMind Debugger";
+  }
+}
+
+export function requiresAIFallback(
+  result: AIErrorResult
+): boolean {
+  return (
+    !result.handled ||
+    result.confidence < 0.7
+  );
+}
+
+export function hasSuggestedFix(
+  result: AIErrorResult
+): boolean {
+  return (
+    typeof result.fixed_code ===
+      "string" &&
+    result.fixed_code
+      .trim()
+      .length > 0
+  );
+}
+
+/* =========================================================
+   DATASET INTELLIGENCE TYPES
+   ========================================================= */
+
+export interface DatasetAnalysis {
+  supported: boolean;
+
+  filename: string;
+
+  rows: number;
+
+  columns: number;
+
+  column_names: string[];
+
+  numeric_columns: string[];
+
+  categorical_columns: string[];
+
+  missing_values:
+    Record<string, number>;
+
+  total_missing_values: number;
+
+  duplicate_rows: number;
+
+  likely_id_columns: string[];
+
+  dtypes:
+    Record<string, string>;
+
+  preview:
+    Record<string, unknown>[];
+}
+
+/* =========================================================
+   NOTEBOOK FILE UPLOAD
+   ========================================================= */
+
+export interface UploadResult {
+  success: boolean;
+
+  filename: string;
+
+  size: number;
+
+  dataset?: DatasetAnalysis;
+
+  dataset_error?: string;
+}
+
+export async function uploadRuntimeFile(
+  sessionId: string,
+  file: File
+): Promise<UploadResult> {
+  const formData =
+    new FormData();
+
+  formData.append(
+    "file",
+    file
+  );
+
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/files`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "File upload failed."
+    );
+  }
+
+  return response.json();
+}
+
+/* =========================================================
+   RUNTIME FILE LIST
+   ========================================================= */
+
+export interface RuntimeFile {
+  name: string;
+
+  size: number;
+
+  extension: string;
+}
+
+export async function getRuntimeFiles(
+  sessionId: string
+): Promise<RuntimeFile[]> {
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/files`
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Could not load runtime files."
+    );
+  }
+
+  const data =
+    await response.json();
+
+  return data.files;
+}
+
+/* =========================================================
+   DATASET ANALYSIS
+   ========================================================= */
+
+export async function getDatasetAnalysis(
+  sessionId: string,
+  filename: string
+): Promise<DatasetAnalysis> {
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/dataset/${encodeURIComponent(
+      filename
+    )}`
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Dataset analysis failed."
+    );
+  }
+
+  return response.json();
+}
+
+/* =========================================================
+   FULL TARGET ANALYSIS
+   ========================================================= */
+
+export interface TargetClassDistribution {
+  value: string;
+  count: number;
+  percentage: number;
+}
+
+export interface TargetAnalysis {
+  target: string;
+
+  task:
+    | "classification"
+    | "regression"
+    | "unknown";
+
+  task_type: string;
+
+  dtype: string;
+
+  is_numeric: boolean;
+
+  total_rows: number;
+
+  non_null_count: number;
+
+  missing_count: number;
+
+  unique_count: number;
+
+  class_distribution?: TargetClassDistribution[];
+
+  largest_class_percentage?: number;
+
+  smallest_class_percentage?: number;
+
+  imbalance_ratio?: number | null;
+
+  imbalance_level?: string;
+
+  minimum?: number;
+
+  maximum?: number;
+
+  mean?: number;
+
+  median?: number;
+
+  standard_deviation?: number;
+
+  /* =====================================================
+     TARGET HEALTH
+     ===================================================== */
+
+  q1?: number;
+
+  q3?: number;
+
+  iqr?: number;
+
+  lower_outlier_bound?: number;
+
+  upper_outlier_bound?: number;
+
+  outlier_count?: number;
+
+  outlier_percentage?: number;
+
+  skewness?: number;
+
+  distribution_shape?:
+    | "approximately_symmetric"
+    | "right_skewed"
+    | "strongly_right_skewed"
+    | "left_skewed"
+    | "strongly_left_skewed";
+
+  negative_count?: number;
+
+  zero_count?: number;
+
+  missing_percentage?: number;
+}
+
+/* =========================================================
+   REQUEST TARGET ANALYSIS
+   ========================================================= */
+
+export async function analyzeDatasetTarget(
+  sessionId: string,
+  filename: string,
+  targetColumn: string
+): Promise<TargetAnalysis> {
+  const encodedFilename =
+    encodeURIComponent(filename);
+
+  const encodedTarget =
+    encodeURIComponent(targetColumn);
+
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/dataset/${encodedFilename}/target/${encodedTarget}`
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Target analysis failed."
+    );
+  }
+
+  return response.json();
+}
+
+/* =========================================================
+   FEATURE ANALYSIS
+   ========================================================= */
+
+export interface FeatureCategoryDistribution {
+  value: string;
+  count: number;
+  percentage: number;
+}
+
+export interface FeatureAnalysis {
+  feature: string;
+
+  dtype: string;
+
+  is_numeric: boolean;
+
+  feature_type?:
+    | "numerical"
+    | "categorical";
+
+  total_rows: number;
+
+  non_null_count: number;
+
+  missing_count: number;
+
+  missing_percentage: number;
+
+  unique_count: number;
+
+  /* =============================================
+     NUMERICAL FEATURE STATISTICS
+     ============================================= */
+
+  minimum?: number;
+
+  maximum?: number;
+
+  mean?: number;
+
+  median?: number;
+
+  standard_deviation?: number;
+
+  q1?: number;
+
+  q3?: number;
+
+  iqr?: number;
+
+  lower_outlier_bound?: number;
+
+  upper_outlier_bound?: number;
+
+  outlier_count?: number;
+
+  outlier_percentage?: number;
+
+  skewness?: number;
+
+  distribution_shape?:
+    | "approximately_symmetric"
+    | "right_skewed"
+    | "strongly_right_skewed"
+    | "left_skewed"
+    | "strongly_left_skewed";
+
+  negative_count?: number;
+
+  zero_count?: number;
+
+  /* =============================================
+     HISTOGRAM DATA
+     ============================================= */
+
+  histogram_counts?: number[];
+
+  histogram_edges?: number[];
+
+  kde_x?: number[];
+  kde_y?: number[];
+
+  /* =============================================
+     CATEGORICAL FEATURE
+     ============================================= */
+
+  category_distribution?:
+    FeatureCategoryDistribution[];
+
+  /* =============================================
+     PREPROCESSING ADVISOR
+     ============================================= */
+
+  imputation_strategy?:
+    | "none"
+    | "mean"
+    | "median"
+    | "most_frequent_or_unknown";
+
+  imputation_reason?: string;
+
+  scaling_strategy?:
+    | "standard"
+    | "robust"
+    | "inspect_after_transform";
+
+  scaling_reason?: string;
+
+  transformation_strategy?:
+    | "none"
+    | "log1p_candidate"
+    | "power_transform_candidate";
+
+  transformation_reason?: string;
+}
+
+/* =========================================================
+   GET FEATURE ANALYSIS
+   ========================================================= */
+
+export async function analyzeDatasetFeature(
+  sessionId: string,
+  filename: string,
+  featureColumn: string
+): Promise<FeatureAnalysis> {
+  const encodedFilename =
+    encodeURIComponent(filename);
+
+  const encodedFeature =
+    encodeURIComponent(featureColumn);
+
+  const response = await fetch(
+    `${API_URL}/runtime/${sessionId}/dataset/${encodedFilename}/feature/${encodedFeature}`
+  );
+
+  if (!response.ok) {
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      data?.detail ||
+        "Feature analysis failed."
+    );
+  }
+
+  return response.json();
+}
+/* =========================================================
+   ML MISTAKE DETECTOR
+   ========================================================= */
+
+export type MLMistakeSeverity =
+  | "critical"
+  | "high"
+  | "warning"
+  | "info";
+
+export interface MLMistakeFinding {
+  id: string;
+  severity: MLMistakeSeverity;
+  confidence: number;
+  category: string;
+  title: string;
+  what_happened: string;
+  why_it_matters: string;
+  recommendation: string;
+  code_example: string;
+  line_number: number | null;
+  learning_level: string;
+  evidence: string;
+  safe_to_apply: boolean;
+  source: string;
+}
+
+export interface MLMistakeResult {
+  handled: boolean;
+  source: string;
+  engine: string;
+  level: string;
+  parse_success: boolean;
+  findings: MLMistakeFinding[];
+  finding_count: number;
+}
+
+export async function analyzeMLMistakes(
+  code: string,
+  level: ExplanationLevel = "Basic"
+): Promise<MLMistakeResult> {
+  const response = await fetch(
+    `${API_URL}/ai/ml-check`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        code,
+        level,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    let message =
+      "ModelMind could not check this ML code.";
+
+    try {
+      const errorData = await response.json();
+
+      if (errorData.detail) {
+        message = errorData.detail;
+      }
+    } catch {
+      // Backend did not return JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+/* =========================================================
+   MODELMIND CODE EXPLAINER
+   ========================================================= */
+
+export interface CodeExplanationStep {
+  line_number: number | null;
+  code: string;
+  title: string;
+  explanation: string;
+}
+
+export interface CodeExplanationConcept {
+  title: string;
+  explanation: string;
+  line_number: number | null;
+}
+
+export interface CodeExplanationVariable {
+  name: string;
+  line_number: number | null;
+  assigned_from: string;
+  explanation: string;
+}
+
+export interface CodeExplanationLibrary {
+  name: string;
+  imported_as: string;
+  line_number: number | null;
+  explanation: string;
+}
+
+export interface CodeExplanationMLFlow {
+  stage: string;
+  explanation: string;
+  line_number: number | null;
+}
+
+export interface CodeExplanationNote {
+  title: string;
+  explanation: string;
+}
+
+export interface CodeExplanationWarning {
+  title: string;
+  message: string;
+}
+
+export interface CodeExplanationResult {
+  handled: boolean;
+
+  source: string;
+
+  engine: string;
+
+  level: string;
+
+  parse_success: boolean;
+
+  summary: string;
+
+  purpose: string;
+
+  steps: CodeExplanationStep[];
+
+  concepts: CodeExplanationConcept[];
+
+  variables: CodeExplanationVariable[];
+
+  libraries: CodeExplanationLibrary[];
+
+  ml_flow: CodeExplanationMLFlow[];
+
+  advanced_notes: CodeExplanationNote[];
+
+  warnings: CodeExplanationWarning[];
+
+  confidence: number;
+}
+
+export async function explainPythonCode(
+  code: string,
+  level: ExplanationLevel = "Basic"
+): Promise<CodeExplanationResult> {
+  const response = await fetch(
+    `${API_URL}/ai/explain-code`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        code,
+        level,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    let message =
+      "ModelMind could not explain this code.";
+
+    try {
+      const errorData =
+        await response.json();
+
+      if (errorData.detail) {
+        message = errorData.detail;
+      }
+    } catch {
+      // Backend did not return JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+===== FeatureAnalyzer.tsx =====
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  DatasetAnalysis,
+  FeatureAnalysis,
+  analyzeDatasetFeature,
+} from "@/lib/api";
+import DistributionPlot from "./DistributionPlot";
+import PreprocessingGuide from "./PreprocessingGuide";
+
+interface Props {
+  dataset: DatasetAnalysis;
+  runtimeId: string;
+  filename: string;
+}
+
+
+export default function FeatureAnalyzer({
+  dataset,
+  runtimeId,
+  filename,
+}: Props) {
+
+  const [feature, setFeature] =
+    useState("");
+
+  const [analysis, setAnalysis] =
+    useState<FeatureAnalysis | null>(
+      null
+    );
+
+  const [isAnalyzing, setIsAnalyzing] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+
+  /* =====================================================
+     LOAD FEATURE ANALYSIS
+     ===================================================== */
+
+  useEffect(() => {
+
+    if (!feature) {
+      setAnalysis(null);
+      setError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadFeature() {
+
+      try {
+
+        setIsAnalyzing(true);
+
+        setError("");
+
+        setAnalysis(null);
+
+        const result =
+          await analyzeDatasetFeature(
+            runtimeId,
+            filename,
+            feature
+          );
+
+        if (!cancelled) {
+          setAnalysis(result);
+        }
+
+      } catch (error) {
+
+        if (!cancelled) {
+
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Feature analysis failed."
+          );
+        }
+
+      } finally {
+
+        if (!cancelled) {
+          setIsAnalyzing(false);
+        }
+      }
+    }
+
+    loadFeature();
+
+    return () => {
+      cancelled = true;
+    };
+
+  }, [
+    feature,
+    runtimeId,
+    filename,
+  ]);
+
+
+  return (
+    <div
+      style={{
+        marginTop: "22px",
+        paddingTop: "20px",
+        borderTop:
+          "1px solid rgba(255,255,255,0.08)",
+      }}
+    >
+
+      {/* =============================================
+          HEADER
+          ============================================= */}
+
+      <div
+        style={{
+          marginBottom: "14px",
+        }}
+      >
+
+        <div
+          style={{
+            fontSize: "15px",
+            fontWeight: 700,
+          }}
+        >
+          ðŸ”¬ Feature Analyzer
+        </div>
+
+        <div
+          style={{
+            marginTop: "5px",
+            fontSize: "11px",
+            opacity: 0.6,
+            lineHeight: 1.6,
+          }}
+        >
+          Understand each input feature
+          before preprocessing and model
+          training.
+        </div>
+
+      </div>
+
+
+      {/* =============================================
+          FEATURE SELECTOR
+          ============================================= */}
+
+      <div
+        style={{
+          marginBottom: "15px",
+        }}
+      >
+
+        <label
+          style={{
+            display: "block",
+            marginBottom: "7px",
+            fontSize: "11px",
+            fontWeight: 600,
+          }}
+        >
+          Which feature do you want to
+          understand?
+        </label>
+
+        <select
+          value={feature}
+          onChange={(event) =>
+            setFeature(
+              event.target.value
+            )
+          }
+          style={{
+            width: "100%",
+            padding: "11px 12px",
+            borderRadius: "8px",
+            border:
+              "1px solid rgba(255,255,255,0.12)",
+            background: "#151820",
+            color: "white",
+            fontSize: "13px",
+          }}
+        >
+
+          <option value="">
+            Select a feature
+          </option>
+
+          {dataset.column_names.map(
+            (column) => (
+
+              <option
+                key={column}
+                value={column}
+              >
+                {column}
+              </option>
+
+            )
+          )}
+
+        </select>
+
+      </div>
+
+
+      {/* =============================================
+          LOADING
+          ============================================= */}
+
+      {isAnalyzing && (
+
+        <StatusBox>
+          Analyzing the complete{" "}
+          <strong>
+            {feature}
+          </strong>{" "}
+          column...
+        </StatusBox>
+
+      )}
+
+
+      {/* =============================================
+          ERROR
+          ============================================= */}
+
+      {error && (
+
+        <div
+          style={{
+            padding: "11px",
+            borderRadius: "8px",
+            border:
+              "1px solid rgba(255,90,90,0.2)",
+            background:
+              "rgba(255,90,90,0.05)",
+            fontSize: "11px",
+          }}
+        >
+          âš  {error}
+        </div>
+
+      )}
+
+
+      {/* =============================================
+          ANALYSIS
+          ============================================= */}
+
+      {analysis &&
+        !isAnalyzing && (
+
+          <FeatureResult
+            analysis={analysis}
+          />
+
+        )}
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   FEATURE RESULT
+   ========================================================= */
+
+function FeatureResult({
+  analysis,
+}: {
+  analysis: FeatureAnalysis;
+}) {
+
+  return (
+    <div>
+
+      {/* BASIC INFORMATION */}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: "9px",
+          marginBottom: "14px",
+        }}
+      >
+
+        <InfoCard
+          label="Feature"
+          value={analysis.feature}
+        />
+
+        <InfoCard
+          label="Feature Type"
+          value={
+            analysis.feature_type ===
+            "numerical"
+              ? "Numerical"
+              : "Categorical"
+          }
+        />
+
+        <InfoCard
+          label="Data Type"
+          value={analysis.dtype}
+        />
+
+        <InfoCard
+          label="Known Values"
+          value={String(
+            analysis.non_null_count
+          )}
+        />
+
+        <InfoCard
+          label="Missing"
+          value={
+            `${analysis.missing_count} ` +
+            `(${analysis.missing_percentage}%)`
+          }
+        />
+
+        <InfoCard
+          label="Unique Values"
+          value={String(
+            analysis.unique_count
+          )}
+        />
+
+      </div>
+
+
+      {/* NUMERICAL */}
+
+      {analysis.feature_type ===
+        "numerical" && (
+
+        <NumericalFeature
+          analysis={analysis}
+        />
+
+      )}
+
+
+      {/* CATEGORICAL */}
+
+      {analysis.feature_type ===
+        "categorical" && (
+
+        <CategoricalFeature
+          analysis={analysis}
+        />
+
+      )}
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   NUMERICAL FEATURE
+   ========================================================= */
+
+function NumericalFeature({
+  analysis,
+}: {
+  analysis: FeatureAnalysis;
+}) {
+
+  return (
+    <>
+
+      {/* STATISTICS */}
+
+      <Section
+        title="ðŸ“Š Numerical Statistics"
+      >
+
+        <StatRow
+          label="Minimum"
+          value={formatNumber(
+            analysis.minimum
+          )}
+        />
+
+        <StatRow
+          label="Maximum"
+          value={formatNumber(
+            analysis.maximum
+          )}
+        />
+
+        <StatRow
+          label="Mean"
+          value={formatNumber(
+            analysis.mean
+          )}
+        />
+
+        <StatRow
+          label="Median"
+          value={formatNumber(
+            analysis.median
+          )}
+        />
+
+        <StatRow
+          label="Standard Deviation"
+          value={formatNumber(
+            analysis.standard_deviation
+          )}
+        />
+
+        <StatRow
+          label="Q1"
+          value={formatNumber(
+            analysis.q1
+          )}
+        />
+
+        <StatRow
+          label="Q3"
+          value={formatNumber(
+            analysis.q3
+          )}
+        />
+
+        <StatRow
+          label="IQR"
+          value={formatNumber(
+            analysis.iqr
+          )}
+        />
+
+      </Section>
+
+
+      {/* DISTRIBUTION */}
+
+      <Section
+        title="ðŸ“ˆ Distribution Analysis"
+      >
+
+        <StatRow
+          label="Shape"
+          value={
+            getDistributionLabel(
+              analysis
+                .distribution_shape
+            )
+          }
+        />
+
+        <StatRow
+          label="Skewness"
+          value={formatNumber(
+            analysis.skewness
+          )}
+        />
+
+        <StatRow
+          label="Outliers"
+          value={
+            `${
+              analysis.outlier_count ??
+              0
+            } (${
+              analysis
+                .outlier_percentage ??
+              0
+            }%)`
+          }
+        />
+
+        <StatRow
+          label="Negative Values"
+          value={String(
+            analysis
+              .negative_count ?? 0
+          )}
+        />
+
+        <StatRow
+          label="Zero Values"
+          value={String(
+            analysis
+              .zero_count ?? 0
+          )}
+        />
+
+      </Section>
+      {/* =============================================
+    HISTOGRAM + KDE VISUALIZATION
+    ============================================= */}
+
+<DistributionPlot
+  analysis={analysis}
+/>
+
+
+
+      {/* IMPUTATION */}
+
+      <AdvisorCard
+        icon="ðŸ§©"
+        title="Missing Value Advisor"
+        recommendation={
+          getImputationLabel(
+            analysis
+              .imputation_strategy
+          )
+        }
+        explanation={
+          analysis
+            .imputation_reason ||
+          "No recommendation available."
+        }
+      />
+
+
+
+      {/* SCALING */}
+
+      <AdvisorCard
+        icon="âš™ï¸"
+        title="Scaling Advisor"
+        recommendation={
+          getScalingLabel(
+            analysis
+              .scaling_strategy
+          )
+        }
+        explanation={
+          analysis
+            .scaling_reason ||
+          "No recommendation available."
+        }
+      />
+
+
+      {/* TRANSFORMATION */}
+
+      <AdvisorCard
+        icon="ðŸ”§"
+        title="Transformation Advisor"
+        recommendation={
+          getTransformationLabel(
+            analysis
+              .transformation_strategy
+          )
+        }
+        explanation={
+          analysis
+            .transformation_reason ||
+          "No recommendation available."
+        }
+      />
+      {/* =============================================
+    STEP-BY-STEP PREPROCESSING GUIDE
+    ============================================= */}
+
+<PreprocessingGuide
+  analysis={analysis}
+/>
+
+
+      {/* IMPORTANT TEACHING NOTE */}
+
+      <div
+        style={{
+          marginTop: "10px",
+          padding: "11px 12px",
+          borderRadius: "8px",
+          border:
+            "1px solid rgba(100,160,255,0.15)",
+          background:
+            "rgba(100,160,255,0.04)",
+          fontSize: "11px",
+          lineHeight: 1.65,
+          opacity: 0.75,
+        }}
+      >
+        ðŸ’¡ Scaling recommendations also
+        depend on the model. For example,
+        KNN, SVM and many linear models
+        are sensitive to feature scale,
+        while Decision Trees and Random
+        Forests generally do not require
+        feature scaling.
+      </div>
+
+    </>
+  );
+}
+
+
+/* =========================================================
+   CATEGORICAL FEATURE
+   ========================================================= */
+
+function CategoricalFeature({
+  analysis,
+}: {
+  analysis: FeatureAnalysis;
+}) {
+
+  const distribution =
+    analysis.category_distribution ??
+    [];
+
+  return (
+    <>
+
+      <Section
+        title="ðŸ“Š Category Distribution"
+      >
+
+        {distribution.length === 0 && (
+          <div
+            style={{
+              fontSize: "11px",
+              opacity: 0.6,
+            }}
+          >
+            No category values
+            available.
+          </div>
+        )}
+
+        {distribution
+          .slice(0, 20)
+          .map((item) => (
+
+            <div
+              key={item.value}
+              style={{
+                marginBottom: "9px",
+              }}
+            >
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent:
+                    "space-between",
+                  gap: "10px",
+                  marginBottom: "4px",
+                  fontSize: "11px",
+                }}
+              >
+
+                <span>
+                  {item.value}
+                </span>
+
+                <strong>
+                  {item.count}{" "}
+                  ({item.percentage}%)
+                </strong>
+
+              </div>
+
+              <div
+                style={{
+                  height: "5px",
+                  borderRadius: "999px",
+                  overflow: "hidden",
+                  background:
+                    "rgba(255,255,255,0.07)",
+                }}
+              >
+
+                <div
+                  style={{
+                    width:
+                      `${Math.min(
+                        item.percentage,
+                        100
+                      )}%`,
+                    height: "100%",
+                    background:
+                      "rgba(120,150,255,0.75)",
+                  }}
+                />
+
+              </div>
+
+            </div>
+
+          ))}
+
+      </Section>
+
+
+      <AdvisorCard
+        icon="ðŸ§©"
+        title="Missing Value Advisor"
+        recommendation={
+          getImputationLabel(
+            analysis
+              .imputation_strategy
+          )
+        }
+        explanation={
+          analysis
+            .imputation_reason ||
+          "No recommendation available."
+        }
+      />
+
+
+      <div
+        style={{
+          marginTop: "10px",
+          padding: "12px",
+          borderRadius: "8px",
+          border:
+            "1px solid rgba(255,255,255,0.08)",
+          background:
+            "rgba(255,255,255,0.025)",
+        }}
+      >
+
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 700,
+            marginBottom: "5px",
+          }}
+        >
+          ðŸ”¤ Encoding Advisor
+        </div>
+
+        <div
+          style={{
+            fontSize: "11px",
+            lineHeight: 1.65,
+            opacity: 0.68,
+          }}
+        >
+          ModelMind will next determine
+          whether this feature is nominal,
+          ordinal, binary or
+          high-cardinality before
+          recommending OneHotEncoder,
+          OrdinalEncoder or another
+          encoding strategy.
+        </div>
+
+      </div>
+
+    </>
+  );
+}
+
+
+/* =========================================================
+   ADVISOR CARD
+   ========================================================= */
+
+function AdvisorCard({
+  icon,
+  title,
+  recommendation,
+  explanation,
+}: {
+  icon: string;
+  title: string;
+  recommendation: string;
+  explanation: string;
+}) {
+
+  return (
+    <div
+      style={{
+        marginTop: "10px",
+        padding: "12px",
+        borderRadius: "8px",
+        border:
+          "1px solid rgba(100,160,255,0.16)",
+        background:
+          "rgba(100,160,255,0.035)",
+      }}
+    >
+
+      <div
+        style={{
+          fontSize: "11px",
+          fontWeight: 700,
+        }}
+      >
+        {icon} {title}
+      </div>
+
+      <div
+        style={{
+          marginTop: "8px",
+          fontSize: "10px",
+          opacity: 0.5,
+        }}
+      >
+        Suggested starting point
+      </div>
+
+      <div
+        style={{
+          marginTop: "3px",
+          fontSize: "13px",
+          fontWeight: 700,
+        }}
+      >
+        {recommendation}
+      </div>
+
+      <div
+        style={{
+          marginTop: "7px",
+          fontSize: "11px",
+          lineHeight: 1.65,
+          opacity: 0.68,
+        }}
+      >
+        {explanation}
+      </div>
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   BASIC UI
+   ========================================================= */
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+
+  return (
+    <div
+      style={{
+        marginTop: "10px",
+        padding: "12px",
+        borderRadius: "8px",
+        border:
+          "1px solid rgba(255,255,255,0.08)",
+        background:
+          "rgba(255,255,255,0.02)",
+      }}
+    >
+
+      <div
+        style={{
+          fontSize: "11px",
+          fontWeight: 700,
+          marginBottom: "9px",
+        }}
+      >
+        {title}
+      </div>
+
+      {children}
+
+    </div>
+  );
+}
+
+
+function InfoCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+
+  return (
+    <div
+      style={{
+        padding: "11px",
+        borderRadius: "8px",
+        border:
+          "1px solid rgba(255,255,255,0.08)",
+        background:
+          "rgba(255,255,255,0.025)",
+      }}
+    >
+
+      <div
+        style={{
+          fontSize: "10px",
+          opacity: 0.5,
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          marginTop: "5px",
+          fontSize: "13px",
+          fontWeight: 700,
+          wordBreak: "break-word",
+        }}
+      >
+        {value}
+      </div>
+
+    </div>
+  );
+}
+
+
+function StatRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent:
+          "space-between",
+        gap: "12px",
+        padding: "4px 0",
+        fontSize: "11px",
+      }}
+    >
+
+      <span
+        style={{
+          opacity: 0.55,
+        }}
+      >
+        {label}
+      </span>
+
+      <strong>
+        {value}
+      </strong>
+
+    </div>
+  );
+}
+
+
+function StatusBox({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+
+  return (
+    <div
+      style={{
+        padding: "12px",
+        borderRadius: "8px",
+        border:
+          "1px solid rgba(255,255,255,0.08)",
+        fontSize: "11px",
+        opacity: 0.7,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   LABEL HELPERS
+   ========================================================= */
+
+function getDistributionLabel(
+  value:
+    | FeatureAnalysis[
+        "distribution_shape"
+      ]
+    | undefined
+): string {
+
+  switch (value) {
+
+    case "approximately_symmetric":
+      return "Approximately symmetric";
+
+    case "right_skewed":
+      return "Right-skewed";
+
+    case "strongly_right_skewed":
+      return "Strongly right-skewed";
+
+    case "left_skewed":
+      return "Left-skewed";
+
+    case "strongly_left_skewed":
+      return "Strongly left-skewed";
+
+    default:
+      return "Unknown";
+  }
+}
+
+
+function getImputationLabel(
+  value:
+    FeatureAnalysis[
+      "imputation_strategy"
+    ]
+): string {
+
+  switch (value) {
+
+    case "mean":
+      return "Mean Imputation";
+
+    case "median":
+      return "Median Imputation";
+
+    case "most_frequent_or_unknown":
+      return (
+        "Most Frequent / Unknown"
+      );
+
+    case "none":
+      return "No Imputation Needed";
+
+    default:
+      return "Inspect Feature";
+  }
+}
+
+
+function getScalingLabel(
+  value:
+    FeatureAnalysis[
+      "scaling_strategy"
+    ]
+): string {
+
+  switch (value) {
+
+    case "standard":
+      return "StandardScaler";
+
+    case "robust":
+      return "RobustScaler";
+
+    case "inspect_after_transform":
+      return (
+        "Inspect After Transformation"
+      );
+
+    default:
+      return "Model Dependent";
+  }
+}
+
+
+function getTransformationLabel(
+  value:
+    FeatureAnalysis[
+      "transformation_strategy"
+    ]
+): string {
+
+  switch (value) {
+
+    case "log1p_candidate":
+      return "Explore log1p";
+
+    case "power_transform_candidate":
+      return (
+        "Explore PowerTransformer"
+      );
+
+    case "none":
+      return (
+        "No Transformation Needed"
+      );
+
+    default:
+      return "Inspect Distribution";
+  }
+}
+
+
+function formatNumber(
+  value: number | undefined
+): string {
+
+  if (
+    value === undefined ||
+    Number.isNaN(value)
+  ) {
+    return "â€”";
+  }
+
+  return Number(
+    value.toFixed(4)
+  ).toLocaleString();
+}
+
+===== app/page.tsx =====
+"use client";
+
+import { useEffect, useState } from "react";
+
+import Sidebar, {
+  Workspace,
+} from "@/components/layout/Sidebar";
+
+import Topbar from "@/components/layout/Topbar";
+import Notebook from "@/components/notebook/Notebook";
+import AITutor from "@/components/ai/AITutor";
+import ModelVisualizationLab from "@/components/visualization/model-lab/ModelVisualizationLab";
+
+import { NotebookCellType } from "@/types/notebook";
+import { createRuntime } from "@/lib/api";
+
+import {
+  LearningLevel,
+  LEARNING_LEVEL_STORAGE_KEY,
+  isLearningLevel,
+} from "@/types/learning";
+
+
+export default function Home() {
+  // =========================================================
+  // GLOBAL LEARNING LEVEL
+  // =========================================================
+
+  const [
+    learningLevel,
+    setLearningLevel,
+  ] = useState<LearningLevel>(
+    "Basic"
+  );
+
+  const [
+    learningLevelLoaded,
+    setLearningLevelLoaded,
+  ] = useState(false);
+
+
+  // =========================================================
+  // WORKSPACE STATE
+  // =========================================================
+
+  const [
+    activeWorkspace,
+    setActiveWorkspace,
+  ] = useState<Workspace>("Notebook");
+
+
+  // =========================================================
+  // RUNTIME STATE
+  // =========================================================
+
+  const [
+    runtimeId,
+    setRuntimeId,
+  ] = useState<string | null>(null);
+
+  const [
+    runtimeStatus,
+    setRuntimeStatus,
+  ] = useState<
+    "connecting" | "ready" | "error"
+  >("connecting");
+
+
+  // =========================================================
+  // AI TUTOR STATE
+  // =========================================================
+
+  const [
+    aiAction,
+    setAIAction,
+  ] = useState("");
+
+  const [
+    selectedCell,
+    setSelectedCell,
+  ] =
+    useState<NotebookCellType | null>(
+      null
+    );
+
+
+  // =========================================================
+  // LOAD SAVED GLOBAL LEARNING LEVEL
+  // =========================================================
+
+  useEffect(() => {
+    const savedLevel =
+      window.localStorage.getItem(
+        LEARNING_LEVEL_STORAGE_KEY
+      );
+
+    if (isLearningLevel(savedLevel)) {
+      setLearningLevel(savedLevel);
+    }
+
+    setLearningLevelLoaded(true);
+  }, []);
+
+
+  // =========================================================
+  // SAVE GLOBAL LEARNING LEVEL
+  // =========================================================
+
+  useEffect(() => {
+    if (!learningLevelLoaded) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      LEARNING_LEVEL_STORAGE_KEY,
+      learningLevel
+    );
+  }, [
+    learningLevel,
+    learningLevelLoaded,
+  ]);
+
+
+  // =========================================================
+  // START MODELMIND PYTHON RUNTIME
+  // =========================================================
+
+  useEffect(() => {
+    async function startRuntime() {
+      try {
+        setRuntimeStatus(
+          "connecting"
+        );
+
+        const result =
+          await createRuntime();
+
+        setRuntimeId(
+          result.session_id
+        );
+
+        setRuntimeStatus(
+          "ready"
+        );
+
+        console.log(
+          "ModelMind runtime ready:",
+          result.session_id
+        );
+      } catch (error) {
+        console.error(
+          "Runtime connection failed:",
+          error
+        );
+
+        setRuntimeId(null);
+
+        setRuntimeStatus(
+          "error"
+        );
+      }
+    }
+
+    startRuntime();
+  }, []);
+
+
+  // =========================================================
+  // AI ACTION
+  // =========================================================
+
+  function handleAIAction(
+    action: string,
+    cell: NotebookCellType
+  ) {
+    setAIAction(action);
+    setSelectedCell(cell);
+  }
+
+
+  // =========================================================
+  // ACCEPT AI FIX
+  // =========================================================
+
+  function handleAcceptFix(
+    cellId: string,
+    correctedCode: string,
+    runAfterAccept: boolean
+  ) {
+    window.dispatchEvent(
+      new CustomEvent(
+        "modelmind-accept-fix",
+        {
+          detail: {
+            cellId,
+            correctedCode,
+            runAfterAccept,
+          },
+        }
+      )
+    );
+  }
+
+
+  // =========================================================
+  // WORKSPACE CONTENT
+  // =========================================================
+
+  function renderWorkspace() {
+    // =======================================================
+    // NOTEBOOK
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Notebook"
+    ) {
+      return (
+        <>
+          <Notebook
+            runtimeId={runtimeId}
+            runtimeStatus={
+              runtimeStatus
+            }
+            learningLevel={
+              learningLevel
+            }
+            onAIAction={
+              handleAIAction
+            }
+          />
+
+          <AITutor
+            action={aiAction}
+            cell={selectedCell}
+            learningLevel={
+              learningLevel
+            }
+            onAcceptFix={
+              handleAcceptFix
+            }
+          />
+        </>
+      );
+    }
+
+
+    // =======================================================
+    // VIDEO LEARNING
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Video Learning"
+    ) {
+      return (
+        <ComingSoon
+          icon="â–¶"
+          title="Video Learning"
+          description={
+            "Educational Video Learning module will be connected here."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // HYPERPARAMETER LAB
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Hyperparameter Lab"
+    ) {
+      return (
+        <ComingSoon
+          icon="â—«"
+          title="Hyperparameter Lab"
+          description={
+            "Interactive hyperparameter tuning and 3D model-performance visualization will be built here."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // DATASETS
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Datasets"
+    ) {
+      return (
+        <ComingSoon
+          icon="â—«"
+          title="Datasets"
+          description={
+            "Dataset management will be available here. Dataset upload remains inside the notebook."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // DATASET INTELLIGENCE
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Dataset Intelligence"
+    ) {
+      return (
+        <ComingSoon
+          icon="â—ˆ"
+          title="Dataset Intelligence"
+          description={
+            "Dataset X-Ray, Target Analyzer and Feature Analyzer are currently available through the notebook."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // VISUAL ML
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Visual ML"
+    ) {
+      return (
+        <ModelVisualizationLab />
+      );
+    }
+
+
+    // =======================================================
+    // LEARN
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Learn"
+    ) {
+      return (
+        <ComingSoon
+          icon="â—‡"
+          title="Learn"
+          description={
+            "Learn Python, NumPy, Pandas, Matplotlib, Seaborn and machine learning step by step."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // ROADMAP
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Roadmap"
+    ) {
+      return (
+        <ComingSoon
+          icon="â†—"
+          title="Learning Roadmap"
+          description={
+            "Your personalized day-by-day machine-learning learning path will appear here."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // EXPERIMENTS
+    // =======================================================
+
+    if (
+      activeWorkspace ===
+      "Experiments"
+    ) {
+      return (
+        <ComingSoon
+          icon="â–¤"
+          title="Experiments"
+          description={
+            "Saved models, experiments, metrics and comparisons will appear here."
+          }
+        />
+      );
+    }
+
+
+    // =======================================================
+    // DASHBOARD
+    // =======================================================
+
+    return (
+      <ComingSoon
+        icon="M"
+        title="ModelMind Dashboard"
+        description={
+          "Your recent notebooks, learning progress, datasets and experiments will appear here."
+        }
+      />
+    );
+  }
+
+
+  // =========================================================
+  // MAIN UI
+  // =========================================================
+
+  return (
+    <main className="appShell">
+      <Sidebar
+        activeWorkspace={
+          activeWorkspace
+        }
+        onWorkspaceChange={
+          setActiveWorkspace
+        }
+      />
+
+      <section className="mainArea">
+        <Topbar
+          learningLevel={
+            learningLevel
+          }
+          onLearningLevelChange={
+            setLearningLevel
+          }
+        />
+
+        <div className="workspace">
+          {renderWorkspace()}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+
+// =============================================================
+// COMING SOON PLACEHOLDER
+// =============================================================
+
+interface ComingSoonProps {
+  icon: string;
+  title: string;
+  description: string;
+}
+
+
+function ComingSoon({
+  icon,
+  title,
+  description,
+}: ComingSoonProps) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "650px",
+          padding: "40px",
+          borderRadius: "16px",
+          border:
+            "1px solid rgba(255,255,255,0.08)",
+          background:
+            "rgba(255,255,255,0.02)",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "34px",
+          }}
+        >
+          {icon}
+        </div>
+
+        <h2
+          style={{
+            marginTop: "14px",
+            marginBottom: "10px",
+          }}
+        >
+          {title}
+        </h2>
+
+        <p
+          style={{
+            margin: 0,
+            opacity: 0.65,
+            lineHeight: 1.7,
+            fontSize: "12px",
+          }}
+        >
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}

@@ -6,6 +6,12 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from runtime.packages import (
+    installed_packages,
+    package_status_for_import,
+    install_package,
+)
+from ai.gemini_fallback import analyze_with_gemini
 
 from debugger.engine import analyze_error
 from runtime.manager import runtime_manager
@@ -62,6 +68,26 @@ class DebugRequest(BaseModel):
     traceback: str = Field(max_length=20000)
     action: str = "explain"
     level: str = "Basic"
+class GeminiDebugRequest(BaseModel):
+    api_key: str = Field(
+        min_length=1,
+        max_length=500
+    )
+
+    code: str = Field(
+        max_length=50000
+    )
+
+    traceback: str = Field(
+        max_length=20000
+    )
+
+    action: str = "explain"
+
+    level: str = "Basic"
+class PackageInstallRequest(BaseModel):
+    package: str
+    version: str | None = None
 class MLMistakeRequest(BaseModel):
     code: str
     level: str = "Basic"
@@ -134,7 +160,104 @@ def delete_runtime(
         "status": "deleted",
     }
 
+# ==========================================
+# PACKAGE / ENVIRONMENT MANAGER
+# ==========================================
 
+
+@app.get(
+    "/runtime/{session_id}/packages"
+)
+def get_installed_packages(
+    session_id: str,
+):
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    packages = installed_packages()
+
+    return {
+        "success": True,
+        "count": len(packages),
+        "packages": packages,
+    }
+
+
+@app.get(
+    "/runtime/{session_id}/packages/status/{import_name}"
+)
+def get_package_status(
+    session_id: str,
+    import_name: str,
+):
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    try:
+        return {
+            "success": True,
+            **package_status_for_import(
+                import_name
+            ),
+        }
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+
+@app.post(
+    "/runtime/{session_id}/packages/install"
+)
+def install_runtime_package(
+    session_id: str,
+    request: PackageInstallRequest,
+):
+    session = runtime_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runtime not found.",
+        )
+
+    try:
+        result = install_package(
+            package_name=request.package,
+            version=request.version,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail=result,
+        )
+
+    return result
 # ==========================================
 # EXECUTE NOTEBOOK CELL
 # ==========================================
@@ -658,10 +781,23 @@ def check_ml_mistakes(
         code=request.code,
         level=request.level,
     )
+
+# =========================================================
+# MODELMIND ERROR INTELLIGENCE
+# =========================================================
+
 @app.post("/ai/error")
 def debug_error(
     request: DebugRequest,
 ):
+    """
+    Run ModelMind's local Error Intelligence first.
+
+    Gemini is NOT called from this endpoint.
+
+    The frontend uses the returned handled/confidence
+    values to decide whether advanced fallback is needed.
+    """
 
     result = analyze_error(
         code=request.code,
@@ -669,13 +805,217 @@ def debug_error(
         level=request.level,
     )
 
+    confidence = float(
+        result.get("confidence", 0.0)
+    )
+
+    handled = bool(
+        result.get("handled", False)
+    )
+
+    needs_fallback = (
+        not handled
+        or confidence < 0.70
+    )
+
     result["source"] = (
-        "modelmind-local"
-        if result["handled"]
-        else "fallback-required"
+        "fallback-required"
+        if needs_fallback
+        else "modelmind-local"
+    )
+
+    result["requires_ai_fallback"] = (
+        needs_fallback
     )
 
     return result
+
+
+# =========================================================
+# GEMINI CONNECTION STATUS
+# =========================================================
+
+@app.get("/ai/gemini/status")
+def gemini_connection_status():
+    from credentials.gemini_credentials import (
+        get_gemini_status,
+    )
+
+    return get_gemini_status()
+
+
+# =========================================================
+# CONNECT GEMINI
+# =========================================================
+
+class GeminiConnectRequest(BaseModel):
+    api_key: str = Field(
+        min_length=1,
+        max_length=500,
+    )
+
+
+@app.post("/ai/gemini/connect")
+def connect_gemini(
+    request: GeminiConnectRequest,
+):
+    from credentials.gemini_credentials import (
+        save_gemini_api_key,
+    )
+
+    result = save_gemini_api_key(
+        request.api_key
+    )
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail=result["message"],
+        )
+
+    return result
+
+
+# =========================================================
+# DISCONNECT GEMINI
+# =========================================================
+
+@app.delete("/ai/gemini/disconnect")
+def disconnect_gemini():
+    from credentials.gemini_credentials import (
+        remove_gemini_api_key,
+    )
+
+    result = remove_gemini_api_key()
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=500,
+            detail=result["message"],
+        )
+
+    return result
+
+
+# =========================================================
+# GEMINI ADVANCED ERROR FALLBACK
+# =========================================================
+
+@app.post("/ai/gemini/error")
+def debug_error_with_gemini(
+    request: DebugRequest,
+):
+    """
+    Gemini is allowed ONLY when ModelMind's local
+    Error Intelligence is not confident enough.
+
+    The saved API key is loaded on the backend.
+    It is never returned to the frontend.
+    """
+
+    # -----------------------------------------------------
+    # Always ask ModelMind local intelligence FIRST.
+    # -----------------------------------------------------
+
+    local_result = analyze_error(
+        code=request.code,
+        traceback=request.traceback,
+        level=request.level,
+    )
+
+    handled = bool(
+        local_result.get(
+            "handled",
+            False,
+        )
+    )
+
+    confidence = float(
+        local_result.get(
+            "confidence",
+            0.0,
+        )
+    )
+
+    # -----------------------------------------------------
+    # HARD CONFIDENCE GATE
+    #
+    # Gemini must NOT be used when the local engine
+    # understands the error with >= 70% confidence.
+    # -----------------------------------------------------
+
+    if (
+        handled
+        and confidence >= 0.70
+    ):
+        local_result["source"] = (
+            "modelmind-local"
+        )
+
+        local_result[
+            "requires_ai_fallback"
+        ] = False
+
+        return local_result
+
+    # -----------------------------------------------------
+    # Only low-confidence/unhandled errors reach here.
+    # -----------------------------------------------------
+
+    from credentials.gemini_credentials import (
+        get_gemini_api_key,
+    )
+
+    api_key = get_gemini_api_key()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=428,
+            detail=(
+                "Gemini is not connected. "
+                "Connect your Gemini API key once "
+                "before using advanced analysis."
+            ),
+        )
+
+    try:
+        result = analyze_with_gemini(
+            api_key=api_key,
+            code=request.code,
+            traceback=request.traceback,
+            action=request.action,
+            level=request.level,
+        )
+
+        result["source"] = "gemini"
+        result[
+            "requires_ai_fallback"
+        ] = False
+
+        return result
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    except RuntimeError:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Gemini could not analyze this "
+                "error right now."
+            ),
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Gemini advanced analysis failed."
+            ),
+        )
 # ==========================================
 # CODE EXPLAINER
 # ==========================================
