@@ -1,0 +1,541 @@
+﻿"use client";
+
+import {
+  useState,
+} from "react";
+
+import type {
+  LearningLevel,
+  RoadmapGoal,
+  RoadmapProfile,
+} from "../../types/roadmap";
+
+interface RoadmapOnboardingProps {
+  onComplete: (
+    profile: RoadmapProfile
+  ) => void;
+}
+
+interface GoalOption {
+  value: RoadmapGoal;
+  title: string;
+  description: string;
+}
+
+interface LevelOption {
+  value: LearningLevel;
+  title: string;
+  description: string;
+}
+
+const goalOptions: GoalOption[] = [
+  {
+    value: "college",
+    title: "College & Exams",
+    description:
+      "Build strong fundamentals and prepare for college ML coursework.",
+  },
+  {
+    value: "ml-engineer",
+    title: "ML Engineer",
+    description:
+      "Learn practical machine learning, preprocessing, evaluation and production-oriented skills.",
+  },
+  {
+    value: "data-scientist",
+    title: "Data Scientist",
+    description:
+      "Focus on statistics, EDA, machine learning and data-driven problem solving.",
+  },
+  {
+    value: "data-analyst",
+    title: "Data Analyst",
+    description:
+      "Develop Python, data cleaning, visualization, analysis and statistical foundations.",
+  },
+  {
+    value: "ai-engineer",
+    title: "AI Engineer",
+    description:
+      "Build a broader AI and machine-learning engineering foundation.",
+  },
+  {
+    value: "deep-learning",
+    title: "Deep Learning",
+    description:
+      "Prepare the foundations required before moving deeper into neural networks.",
+  },
+  {
+    value: "placement",
+    title: "Placement Preparation",
+    description:
+      "Build interview-ready ML understanding, coding confidence and projects.",
+  },
+  {
+    value: "hackathon",
+    title: "Hackathon",
+    description:
+      "Learn the practical skills needed to build ML prototypes quickly.",
+  },
+  {
+    value: "project",
+    title: "Build Projects",
+    description:
+      "Learn machine learning primarily through progressively harder projects.",
+  },
+  {
+    value: "custom",
+    title: "Custom Goal",
+    description:
+      "Describe your own learning objective and create a roadmap around it.",
+  },
+];
+
+const levelOptions: LevelOption[] = [
+  {
+    value: "beginner",
+    title: "Beginner",
+    description:
+      "I am new to Python, data science or machine learning.",
+  },
+  {
+    value: "intermediate",
+    title: "Intermediate",
+    description:
+      "I know the basics and want stronger practical ML skills.",
+  },
+  {
+    value: "advanced",
+    title: "Advanced",
+    description:
+      "I already understand ML fundamentals and want deeper, industry-oriented learning.",
+  },
+];
+
+export default function RoadmapOnboarding({
+  onComplete,
+}: RoadmapOnboardingProps) {
+  const [step, setStep] =
+    useState(1);
+
+  const [goal, setGoal] =
+    useState<RoadmapGoal>(
+      "college"
+    );
+
+  const [level, setLevel] =
+    useState<LearningLevel>(
+      "beginner"
+    );
+
+  const [durationWeeks, setDurationWeeks] =
+    useState(8);
+
+  const [minutesPerDay, setMinutesPerDay] =
+    useState(60);
+
+  const [customGoal, setCustomGoal] =
+    useState("");
+
+  function goNext() {
+    setStep((current) =>
+      Math.min(current + 1, 3)
+    );
+  }
+
+  function goBack() {
+    setStep((current) =>
+      Math.max(current - 1, 1)
+    );
+  }
+
+  function createProfile() {
+    const profile: RoadmapProfile = {
+      goal,
+      level,
+      durationWeeks,
+      minutesPerDay,
+      customGoal:
+        goal === "custom"
+          ? customGoal.trim()
+          : undefined,
+    };
+
+    onComplete(profile);
+  }
+
+  return (
+    <main className="roadmap-onboarding">
+      <header className="roadmap-onboarding-header">
+        <p className="roadmap-eyebrow">
+          PERSONALIZED ROADMAP
+        </p>
+
+        <h1>
+          Build your learning path
+        </h1>
+
+        <p>
+          Tell ModelMind what you want to
+          achieve. Your roadmap will adapt
+          to your goal, current level and
+          progress.
+        </p>
+
+        <div className="roadmap-step-indicator">
+          <span
+            className={
+              step >= 1
+                ? "active"
+                : ""
+            }
+          >
+            1
+          </span>
+
+          <div />
+
+          <span
+            className={
+              step >= 2
+                ? "active"
+                : ""
+            }
+          >
+            2
+          </span>
+
+          <div />
+
+          <span
+            className={
+              step >= 3
+                ? "active"
+                : ""
+            }
+          >
+            3
+          </span>
+        </div>
+      </header>
+
+      {step === 1 && (
+        <section className="roadmap-onboarding-step">
+          <div className="roadmap-step-heading">
+            <span>
+              STEP 1
+            </span>
+
+            <h2>
+              What is your goal?
+            </h2>
+
+            <p>
+              Choose the outcome you want
+              your roadmap to focus on.
+            </p>
+          </div>
+
+          <div className="roadmap-option-grid">
+            {goalOptions.map(
+              (option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={[
+                    "roadmap-option-card",
+                    goal === option.value
+                      ? "selected"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() =>
+                    setGoal(
+                      option.value
+                    )
+                  }
+                >
+                  <h3>
+                    {option.title}
+                  </h3>
+
+                  <p>
+                    {
+                      option.description
+                    }
+                  </p>
+
+                  <span>
+                    {goal ===
+                    option.value
+                      ? "Selected"
+                      : "Choose"}
+                  </span>
+                </button>
+              )
+            )}
+          </div>
+
+          {goal === "custom" && (
+            <div className="roadmap-custom-goal">
+              <label htmlFor="custom-roadmap-goal">
+                Describe your goal
+              </label>
+
+              <textarea
+                id="custom-roadmap-goal"
+                value={customGoal}
+                onChange={(event) =>
+                  setCustomGoal(
+                    event.target.value
+                  )
+                }
+                placeholder="Example: I want to learn enough machine learning to build an end-to-end healthcare prediction project."
+                rows={4}
+              />
+            </div>
+          )}
+
+          <div className="roadmap-onboarding-actions">
+            <button
+              type="button"
+              className="roadmap-primary-button"
+              disabled={
+                goal === "custom" &&
+                customGoal.trim()
+                  .length === 0
+              }
+              onClick={goNext}
+            >
+              Continue â†’
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === 2 && (
+        <section className="roadmap-onboarding-step">
+          <div className="roadmap-step-heading">
+            <span>
+              STEP 2
+            </span>
+
+            <h2>
+              What is your current level?
+            </h2>
+
+            <p>
+              This changes the depth and
+              difficulty of your roadmap.
+            </p>
+          </div>
+
+          <div className="roadmap-level-grid">
+            {levelOptions.map(
+              (option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={[
+                    "roadmap-option-card",
+                    level === option.value
+                      ? "selected"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() =>
+                    setLevel(
+                      option.value
+                    )
+                  }
+                >
+                  <h3>
+                    {option.title}
+                  </h3>
+
+                  <p>
+                    {
+                      option.description
+                    }
+                  </p>
+
+                  <span>
+                    {level ===
+                    option.value
+                      ? "Selected"
+                      : "Choose"}
+                  </span>
+                </button>
+              )
+            )}
+          </div>
+
+          <div className="roadmap-onboarding-actions">
+            <button
+              type="button"
+              className="roadmap-secondary-button"
+              onClick={goBack}
+            >
+              â† Back
+            </button>
+
+            <button
+              type="button"
+              className="roadmap-primary-button"
+              onClick={goNext}
+            >
+              Continue â†’
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === 3 && (
+        <section className="roadmap-onboarding-step">
+          <div className="roadmap-step-heading">
+            <span>
+              STEP 3
+            </span>
+
+            <h2>
+              Choose your pace
+            </h2>
+
+            <p>
+              ModelMind will use this
+              information internally to
+              balance your roadmap.
+            </p>
+          </div>
+
+          <div className="roadmap-pace-section">
+            <div className="roadmap-field">
+              <label htmlFor="roadmap-duration">
+                Roadmap duration
+              </label>
+
+              <select
+                id="roadmap-duration"
+                value={durationWeeks}
+                onChange={(event) =>
+                  setDurationWeeks(
+                    Number(
+                      event.target.value
+                    )
+                  )
+                }
+              >
+                <option value={6}>
+                  6 weeks
+                </option>
+
+                <option value={7}>
+                  7 weeks
+                </option>
+
+                <option value={8}>
+                  8 weeks
+                </option>
+              </select>
+            </div>
+
+            <div className="roadmap-field">
+              <label htmlFor="roadmap-pace">
+                Daily learning pace
+              </label>
+
+              <select
+                id="roadmap-pace"
+                value={minutesPerDay}
+                onChange={(event) =>
+                  setMinutesPerDay(
+                    Number(
+                      event.target.value
+                    )
+                  )
+                }
+              >
+                <option value={45}>
+                  Light
+                </option>
+
+                <option value={60}>
+                  Balanced
+                </option>
+
+                <option value={90}>
+                  Focused
+                </option>
+
+                <option value={120}>
+                  Intensive
+                </option>
+              </select>
+
+              <p className="roadmap-field-help">
+                We use this only to balance
+                the learning workload. Your
+                roadmap will still be shown
+                as Day 1, Day 2, Day 3 and
+                so on.
+              </p>
+            </div>
+          </div>
+
+          <div className="roadmap-profile-summary">
+            <span>
+              YOUR PLAN
+            </span>
+
+            <h3>
+              {
+                goalOptions.find(
+                  (option) =>
+                    option.value === goal
+                )?.title
+              }
+            </h3>
+
+            <p>
+              {
+                levelOptions.find(
+                  (option) =>
+                    option.value === level
+                )?.title
+              }{" "}
+              learning path â€¢{" "}
+              {durationWeeks}-week plan
+            </p>
+
+            {goal === "custom" &&
+              customGoal && (
+                <p>
+                  {customGoal}
+                </p>
+              )}
+          </div>
+
+          <div className="roadmap-onboarding-actions">
+            <button
+              type="button"
+              className="roadmap-secondary-button"
+              onClick={goBack}
+            >
+              â† Back
+            </button>
+
+            <button
+              type="button"
+              className="roadmap-primary-button"
+              onClick={createProfile}
+            >
+              Create My Roadmap â†’
+            </button>
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}

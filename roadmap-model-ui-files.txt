@@ -1,0 +1,4902 @@
+
+
+============================================================
+FILE: D:\ModelMind_personalised\components\roadmap\RoadmapLessonViewer.tsx
+============================================================
+
+"use client";
+
+
+
+import {
+  useEffect,
+  useState,
+} from "react";
+import RoadmapNativeVisualization from "./visualizations/RoadmapNativeVisualization";
+
+
+
+import type {
+
+  LessonContent,
+
+} from "../../types/roadmap";
+
+import RoadmapPracticeViewer from "./RoadmapPracticeViewer";
+import RoadmapModelDeepDive from "./RoadmapModelDeepDive";
+
+
+
+
+
+type LessonStage =
+
+  | "learn"
+
+  | "visualize"
+
+  | "code"
+
+  | "practice";
+
+
+
+
+
+interface RoadmapLessonViewerProps {
+
+  lesson: LessonContent;
+
+
+
+  learnCompleted?: boolean;
+
+
+
+  visualizeCompleted?: boolean;
+
+
+
+  codeCompleted?: boolean;
+
+
+
+  practiceCompleted?: boolean;
+
+  completedPracticeProblemIds?: string[];
+
+onPracticeProblemComplete?: (
+  problemId: string
+) => void;
+
+
+
+  onLearnComplete?: () => void;
+
+
+
+  onVisualizeComplete?: () => void;
+
+
+
+  onCodeComplete?: () => void;
+
+
+
+  onPracticeComplete?: () => void;
+
+}
+
+
+
+export default function RoadmapLessonViewer({
+
+  lesson,
+
+  learnCompleted = false,
+
+  visualizeCompleted = false,
+
+  codeCompleted = false,
+
+  practiceCompleted = false,
+  completedPracticeProblemIds = [],
+
+  onLearnComplete,
+
+  onVisualizeComplete,
+
+  onCodeComplete,
+
+  onPracticeComplete,
+  onPracticeProblemComplete,
+
+}: RoadmapLessonViewerProps) {
+
+  const [activeStage, setActiveStage] =
+
+    useState<LessonStage>("learn");
+
+
+
+  const [
+
+    activeSectionIndex,
+
+    setActiveSectionIndex,
+
+  ] = useState(0);
+
+  const [
+
+  completedSectionIds,
+
+  setCompletedSectionIds,
+
+] = useState<string[]>(
+
+  () =>
+
+    learnCompleted
+
+      ? lesson.sections.map(
+
+          (section) =>
+
+            section.id
+
+        )
+
+      : []
+
+);
+
+
+
+
+  // =========================================================
+// RESET VIEWER WHEN LESSON CHANGES
+// =========================================================
+//
+// A RoadmapLessonViewer instance can receive a different
+// lesson when the learner moves between roadmap topics.
+//
+// React preserves local component state unless we reset it.
+// Without this reset, the previous lesson can leave behind:
+//
+// - its active section
+// - its active stage
+// - its completed section IDs
+// - its displayed lesson progress
+//
+// This keeps every skill lesson independent.
+// =========================================================
+
+useEffect(() => {
+  setActiveStage("learn");
+
+  setActiveSectionIndex(0);
+
+  setCompletedSectionIds(
+    learnCompleted
+      ? lesson.sections.map(
+          (section) =>
+            section.id
+        )
+      : []
+  );
+}, [
+  lesson.id,
+  learnCompleted,
+]);
+  const activeSection =
+
+    lesson.sections[
+
+      activeSectionIndex
+
+    ];
+
+
+
+
+
+  const goToPreviousSection = () => {
+
+    setActiveSectionIndex(
+
+      (current) =>
+
+        Math.max(
+
+          current - 1,
+
+          0
+
+        )
+
+    );
+
+  };
+
+
+
+
+
+  const goToNextSection = () => {
+
+    setActiveSectionIndex(
+
+      (current) =>
+
+        Math.min(
+
+          current + 1,
+
+          lesson.sections.length - 1
+
+        )
+
+    );
+
+  };
+
+
+
+
+
+  /*
+ * Overall lesson progress must be based on
+ * persisted roadmap activity state.
+ *
+ * Each lesson has four learning stages:
+ *
+ * Learn
+ * Visualize
+ * Code
+ * Practice
+ *
+ * These values come from the roadmap and
+ * therefore survive browser refresh.
+ */
+const completedLessonStages = [
+  learnCompleted,
+  visualizeCompleted,
+  codeCompleted,
+  practiceCompleted,
+].filter(Boolean).length;
+
+const lessonProgress =
+  Math.round(
+    (completedLessonStages / 4) *
+      100
+  );
+
+
+
+
+
+const activeSectionCompleted =
+
+  activeSection
+
+    ? completedSectionIds.includes(
+
+        activeSection.id
+
+      )
+
+    : false;
+
+
+
+
+
+const markCurrentSectionComplete = () => {
+
+  if (!activeSection) {
+
+    return;
+
+  }
+
+
+
+  if (activeSectionCompleted) {
+
+    return;
+
+  }
+
+
+
+  const updated = [
+
+    ...completedSectionIds,
+
+    activeSection.id,
+
+  ];
+
+
+
+  setCompletedSectionIds(
+
+    updated
+
+  );
+
+
+
+  if (
+
+    updated.length ===
+
+    lesson.sections.length
+
+  ) {
+
+    onLearnComplete?.();
+
+  }
+
+};
+
+
+
+
+
+const completeAndContinue = () => {
+
+  if (!activeSection) {
+
+    return;
+
+  }
+
+
+
+  let updated =
+
+    completedSectionIds;
+
+
+
+  if (!activeSectionCompleted) {
+
+    updated = [
+
+      ...completedSectionIds,
+
+      activeSection.id,
+
+    ];
+
+
+
+    setCompletedSectionIds(
+
+      updated
+
+    );
+
+
+
+    if (
+
+      updated.length ===
+
+      lesson.sections.length
+
+    ) {
+
+      onLearnComplete?.();
+
+    }
+
+  }
+
+
+
+  if (
+
+    activeSectionIndex <
+
+    lesson.sections.length - 1
+
+  ) {
+
+    goToNextSection();
+
+  }
+
+};
+
+
+
+
+
+  return (
+
+    <div className="lesson-viewer">
+
+      <header className="lesson-viewer-header">
+
+        <div>
+
+          <span className="roadmap-section-label">
+
+            DEEP LESSON
+
+          </span>
+
+
+
+          <h3 className="lesson-viewer-title">
+
+            {lesson.title}
+
+          </h3>
+
+
+
+          {lesson.subtitle && (
+
+            <p className="lesson-viewer-subtitle">
+
+              {lesson.subtitle}
+
+            </p>
+
+          )}
+
+        </div>
+
+
+
+        <div className="lesson-viewer-progress">
+
+          <div className="lesson-viewer-progress-meta">
+
+            <span>
+
+              Lesson progress
+
+            </span>
+
+
+
+            <strong>
+
+              {lessonProgress}%
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="lesson-viewer-progress-track">
+
+            <div
+
+              className="lesson-viewer-progress-fill"
+
+              style={{
+
+                width:
+
+                  `${lessonProgress}%`,
+
+              }}
+
+            />
+
+          </div>
+
+        </div>
+
+      </header>
+
+
+
+
+
+      <nav
+
+        className="lesson-stage-tabs"
+
+        aria-label="Lesson stages"
+
+      >
+
+        <button
+
+          type="button"
+
+          className={
+
+            activeStage === "learn"
+
+              ? "lesson-stage-tab lesson-stage-tab-active"
+
+              : "lesson-stage-tab"
+
+          }
+
+          onClick={() =>
+
+            setActiveStage("learn")
+
+          }
+
+        >
+
+          <span>01</span>
+
+          Learn
+
+        </button>
+
+
+
+        <button
+
+          type="button"
+
+          className={
+
+            activeStage ===
+
+            "visualize"
+
+              ? "lesson-stage-tab lesson-stage-tab-active"
+
+              : "lesson-stage-tab"
+
+          }
+
+          onClick={() =>
+
+            setActiveStage(
+
+              "visualize"
+
+            )
+
+          }
+
+        >
+
+          <span>02</span>
+
+          Visualize
+
+        </button>
+
+
+
+        <button
+
+          type="button"
+
+          className={
+
+            activeStage === "code"
+
+              ? "lesson-stage-tab lesson-stage-tab-active"
+
+              : "lesson-stage-tab"
+
+          }
+
+          onClick={() =>
+
+            setActiveStage("code")
+
+          }
+
+        >
+
+          <span>03</span>
+
+          Code
+
+        </button>
+
+
+
+        <button
+
+          type="button"
+
+          className={
+
+            activeStage ===
+
+            "practice"
+
+              ? "lesson-stage-tab lesson-stage-tab-active"
+
+              : "lesson-stage-tab"
+
+          }
+
+          onClick={() =>
+
+            setActiveStage(
+
+              "practice"
+
+            )
+
+          }
+
+        >
+
+          <span>04</span>
+
+          Practice
+
+        </button>
+
+      </nav>
+
+
+
+
+
+      {activeStage === "learn" && (
+
+        <div className="lesson-learn-layout">
+
+          <aside className="lesson-section-navigation">
+
+            <div className="lesson-section-navigation-header">
+
+              <span>
+
+                LESSON SECTIONS
+
+              </span>
+
+
+
+              <strong>
+
+                {
+
+                  lesson.sections
+
+                    .length
+
+                }
+
+              </strong>
+
+            </div>
+
+
+
+            <div className="lesson-section-list">
+
+              {lesson.sections.map(
+
+                (
+
+                  section,
+
+                  index
+
+                ) => (
+
+                  <button
+
+                    key={
+
+                      section.id
+
+                    }
+
+                    type="button"
+
+                    className={
+
+                      index ===
+
+                      activeSectionIndex
+
+                        ? "lesson-section-button lesson-section-button-active"
+
+                        : "lesson-section-button"
+
+                    }
+
+                    onClick={() =>
+
+                      setActiveSectionIndex(
+
+                        index
+
+                      )
+
+                    }
+
+                  >
+
+                    <span className="lesson-section-number">
+
+  {completedSectionIds.includes(
+
+    section.id
+
+  )
+
+    ? "✓"
+
+    : String(
+
+        index + 1
+
+      ).padStart(
+
+        2,
+
+        "0"
+
+      )}
+
+</span>
+
+
+
+                    <span className="lesson-section-name">
+
+                      {
+
+                        section.title
+
+                      }
+
+                    </span>
+
+                  </button>
+
+                )
+
+              )}
+
+            </div>
+
+          </aside>
+
+
+
+
+
+          {activeSection && (
+
+            <article className="lesson-content-panel">
+
+              <header className="lesson-content-header">
+
+                <span className="lesson-content-counter">
+
+                  SECTION{" "}
+
+                  {activeSectionIndex +
+
+                    1}{" "}
+
+                  OF{" "}
+
+                  {
+
+                    lesson.sections
+
+                      .length
+
+                  }
+
+                </span>
+
+
+
+                <h3>
+
+                  {
+
+                    activeSection.title
+
+                  }
+
+                </h3>
+
+              </header>
+
+
+
+
+
+              <section className="lesson-explanation">
+
+                {activeSection.explanation.map(
+
+                  (
+
+                    paragraph,
+
+                    index
+
+                  ) => (
+
+                    <p
+
+                      key={`${activeSection.id}-explanation-${index}`}
+
+                    >
+
+                      {paragraph}
+
+                    </p>
+
+                  )
+
+                )}
+
+              </section>
+
+
+
+
+
+              {activeSection.intuition &&
+
+                activeSection
+
+                  .intuition.length >
+
+                  0 && (
+
+                  <section className="lesson-callout lesson-intuition">
+
+                    <div className="lesson-callout-heading">
+
+                      <span>
+
+                        ◎
+
+                      </span>
+
+
+
+                      <h4>
+
+                        Build the
+
+                        intuition
+
+                      </h4>
+
+                    </div>
+
+
+
+                    {activeSection.intuition.map(
+
+                      (
+
+                        point,
+
+                        index
+
+                      ) => (
+
+                        <p
+
+                          key={`${activeSection.id}-intuition-${index}`}
+
+                        >
+
+                          {point}
+
+                        </p>
+
+                      )
+
+                    )}
+
+                  </section>
+
+                )}
+
+
+
+
+
+              {activeSection
+
+                .importantPoints &&
+
+                activeSection
+
+                  .importantPoints
+
+                  .length > 0 && (
+
+                  <section className="lesson-important-points">
+
+                    <h4>
+
+                      Important points
+
+                    </h4>
+
+
+
+                    <div className="lesson-important-point-list">
+
+                      {activeSection.importantPoints.map(
+
+                        (
+
+                          point,
+
+                          index
+
+                        ) => (
+
+                          <div
+
+                            key={`${activeSection.id}-point-${index}`}
+
+                            className="lesson-important-point"
+
+                          >
+
+                            <span>
+
+                              ✓
+
+                            </span>
+
+
+
+                            <p>
+
+                              {point}
+
+                            </p>
+
+                          </div>
+
+                        )
+
+                      )}
+
+                    </div>
+
+                  </section>
+
+                )}
+
+
+
+
+
+              {activeSection
+
+                .mathematics && (
+
+                <section className="lesson-mathematics">
+
+                  <span className="roadmap-section-label">
+
+                    MATHEMATICS
+
+                  </span>
+
+
+
+                  <h4>
+
+                    {activeSection
+
+                      .mathematics
+
+                      .title ??
+
+                      "Understand the mathematics"}
+
+                  </h4>
+
+
+
+                  <p>
+
+                    {
+
+                      activeSection
+
+                        .mathematics
+
+                        .explanation
+
+                    }
+
+                  </p>
+
+
+
+                  {activeSection
+
+                    .mathematics
+
+                    .formula && (
+
+                    <div className="lesson-formula">
+
+                      {
+
+                        activeSection
+
+                          .mathematics
+
+                          .formula
+
+                      }
+
+                    </div>
+
+                  )}
+
+
+
+                  {activeSection
+
+                    .mathematics
+
+                    .variables &&
+
+                    activeSection
+
+                      .mathematics
+
+                      .variables!
+
+                      .length >
+
+                      0 && (
+
+                      <div className="lesson-math-variables">
+
+                        {activeSection.mathematics.variables!.map(
+
+                          (
+
+                            variable,
+
+                            index
+
+                          ) => (
+
+                            <div
+
+                              key={`${activeSection.id}-variable-${index}`}
+
+                              className="lesson-math-variable"
+
+                            >
+
+                              <strong>
+
+                                {
+
+                                  variable.symbol
+
+                                }
+
+                              </strong>
+
+
+
+                              <span>
+
+                                {
+
+                                  variable.meaning
+
+                                }
+
+                              </span>
+
+                            </div>
+
+                          )
+
+                        )}
+
+                      </div>
+
+                    )}
+
+
+
+                  {activeSection
+
+                    .mathematics
+
+                    .example && (
+
+                    <div className="lesson-math-example">
+
+                      <strong>
+
+                        Example
+
+                      </strong>
+
+
+
+                      <p>
+
+                        {
+
+                          activeSection
+
+                            .mathematics
+
+                            .example
+
+                        }
+
+                      </p>
+
+                    </div>
+
+                  )}
+
+                </section>
+
+              )}
+
+
+
+
+
+              {activeSection.examples &&
+
+                activeSection.examples
+
+                  .length > 0 && (
+
+                  <section className="lesson-examples">
+
+                    <div className="lesson-block-heading">
+
+                      <span className="roadmap-section-label">
+
+                        EXAMPLES
+
+                      </span>
+
+
+
+                      <h4>
+
+                        See the concept
+
+                        in action
+
+                      </h4>
+
+                    </div>
+
+
+
+                    {activeSection.examples.map(
+
+                      (example) => (
+
+                        <article
+
+                          key={
+
+                            example.id
+
+                          }
+
+                          className="lesson-example-card"
+
+                        >
+
+                          <h4>
+
+                            {
+
+                              example.title
+
+                            }
+
+                          </h4>
+
+
+
+                          <p>
+
+                            {
+
+                              example.explanation
+
+                            }
+
+                          </p>
+
+
+
+                          {example.code && (
+
+                            <div className="lesson-code-block">
+
+                              <div className="lesson-code-header">
+
+                                <span>
+
+                                  {example.language ??
+
+                                    "code"}
+
+                                </span>
+
+                              </div>
+
+
+
+                              <pre>
+
+                                <code>
+
+                                  {
+
+                                    example.code
+
+                                  }
+
+                                </code>
+
+                              </pre>
+
+                            </div>
+
+                          )}
+
+
+
+                          {example.output && (
+
+                            <div className="lesson-output-block">
+
+                              <span>
+
+                                OUTPUT
+
+                              </span>
+
+
+
+                              <pre>
+
+                                {
+
+                                  example.output
+
+                                }
+
+                              </pre>
+
+                            </div>
+
+                          )}
+
+
+
+                          {example
+
+                            .importantPoints &&
+
+                            example
+
+                              .importantPoints
+
+                              .length >
+
+                              0 && (
+
+                              <div className="lesson-example-points">
+
+                                {example.importantPoints.map(
+
+                                  (
+
+                                    point,
+
+                                    index
+
+                                  ) => (
+
+                                    <p
+
+                                      key={`${example.id}-point-${index}`}
+
+                                    >
+
+                                      <span>
+
+                                        →
+
+                                      </span>
+
+
+
+                                      {
+
+                                        point
+
+                                      }
+
+                                    </p>
+
+                                  )
+
+                                )}
+
+                              </div>
+
+                            )}
+
+                        </article>
+
+                      )
+
+                    )}
+
+                  </section>
+
+                )}
+
+              {lesson.modelDeepDive &&
+  activeSectionIndex ===
+    lesson.sections.length - 1 && (
+    <RoadmapModelDeepDive
+      deepDive={
+        lesson.modelDeepDive
+      }
+    />
+  )}
+
+
+              
+
+
+
+
+              <footer className="lesson-section-footer">
+
+  <button
+
+    type="button"
+
+    className="lesson-navigation-button"
+
+    disabled={
+
+      activeSectionIndex === 0
+
+    }
+
+    onClick={
+
+      goToPreviousSection
+
+    }
+
+  >
+
+    ← Previous
+
+  </button>
+
+
+
+  <div className="lesson-section-completion">
+
+    <span>
+
+      {activeSectionIndex + 1}
+
+      {" / "}
+
+      {lesson.sections.length}
+
+    </span>
+
+
+
+    {activeSectionCompleted && (
+
+      <strong>
+
+        ✓ Completed
+
+      </strong>
+
+    )}
+
+  </div>
+
+
+
+  {activeSectionIndex <
+
+  lesson.sections.length - 1 ? (
+
+    <button
+
+      type="button"
+
+      className="lesson-navigation-button lesson-navigation-button-primary"
+
+      onClick={
+
+        completeAndContinue
+
+      }
+
+    >
+
+      {activeSectionCompleted
+
+        ? "Continue →"
+
+        : "Complete & Continue →"}
+
+    </button>
+
+  ) : (
+
+    <button
+
+      type="button"
+
+      className="lesson-navigation-button lesson-navigation-button-primary"
+
+      disabled={
+
+        activeSectionCompleted
+
+      }
+
+      onClick={
+
+        markCurrentSectionComplete
+
+      }
+
+    >
+
+      {activeSectionCompleted
+
+        ? "✓ Section Completed"
+
+        : "Complete Section"}
+
+    </button>
+
+  )}
+
+</footer>
+
+            </article>
+
+          )}
+
+        </div>
+
+      )}
+
+
+
+
+
+      {activeStage ===
+
+        "visualize" && (
+
+        <section className="lesson-stage-placeholder">
+
+          <span className="roadmap-section-label">
+
+            VISUALIZE
+
+          </span>
+
+
+
+          <h3>
+
+            {lesson.visualization
+
+              ?.title ??
+
+              "Interactive visualization"}
+
+          </h3>
+
+
+
+          <p>
+
+            {lesson.visualization
+
+              ?.description ??
+
+              "An interactive visualization is not configured for this lesson yet."}
+
+          </p>
+
+
+
+          {lesson.visualization
+
+            ?.type ===
+
+            "model-lab" && (
+
+            <div className="lesson-model-lab-notice">
+
+              This lesson is connected
+
+              to a ModelMind Model Lab.
+
+              The existing lab will be
+
+              integrated here later.
+
+            </div>
+
+          )}
+
+
+
+          {lesson.visualization?.type ===
+  "native" && (
+  <RoadmapNativeVisualization
+    visualizationId={
+      lesson.visualization
+        .visualizationId
+    }
+    title={
+      lesson.visualization.title
+    }
+    description={
+      lesson.visualization
+        .description
+    }
+    skillId={lesson.skillId}
+  />
+)}
+
+                  <div className="lesson-stage-completion">
+            <button
+              type="button"
+              className="day-complete-button"
+              disabled={visualizeCompleted}
+              onClick={onVisualizeComplete}
+            >
+              {visualizeCompleted
+                ? "Visualization Completed ✓"
+                : lesson.visualization?.type === "model-lab"
+                  ? "Mark Model Lab Complete"
+                  : "Complete Visualization"}
+            </button>
+          </div>
+
+</section>
+
+      )
+
+
+
+      }
+
+
+
+
+
+      {activeStage === "code" && (
+
+  <section className="lesson-code-workspace">
+
+    <header className="lesson-code-workspace-header">
+
+      <span className="roadmap-section-label">
+
+        CODE
+
+      </span>
+
+
+
+      <h3>
+
+        Guided coding
+
+      </h3>
+
+
+
+      <p>
+
+        Study the complete implementation
+
+        and understand what every important
+
+        part of the code is doing.
+
+      </p>
+
+    </header>
+
+
+
+    {lesson.codeExamples.length > 0 ? (
+
+      <div className="lesson-guided-code-list">
+
+        {lesson.codeExamples.map(
+
+          (example, index) => (
+
+            <article
+
+              key={example.id}
+
+              className="lesson-guided-code-card"
+
+            >
+
+              <header className="lesson-guided-code-header">
+
+                <div className="lesson-guided-code-number">
+
+                  {String(index + 1).padStart(
+
+                    2,
+
+                    "0"
+
+                  )}
+
+                </div>
+
+
+
+                <div>
+
+                  <span>
+
+                    GUIDED EXAMPLE
+
+                  </span>
+
+
+
+                  <h4>
+
+                    {example.title}
+
+                  </h4>
+
+
+
+                  <p>
+
+                    {example.description}
+
+                  </p>
+
+                </div>
+
+              </header>
+
+
+
+              <div className="lesson-guided-code-editor">
+
+                <div className="lesson-guided-code-toolbar">
+
+                  <div>
+
+                    <span className="lesson-editor-dot" />
+
+                    <span className="lesson-editor-dot" />
+
+                    <span className="lesson-editor-dot" />
+
+                  </div>
+
+
+
+                  <span>
+
+                    {example.language}
+
+                  </span>
+
+                </div>
+
+
+
+                <pre>
+
+                  <code>
+
+                    {example.code}
+
+                  </code>
+
+                </pre>
+
+              </div>
+
+
+
+              {example.expectedOutput && (
+
+                <div className="lesson-guided-output">
+
+                  <span>
+
+                    EXPECTED OUTPUT
+
+                  </span>
+
+
+
+                  <pre>
+
+                    {example.expectedOutput}
+
+                  </pre>
+
+                </div>
+
+              )}
+
+
+
+              <section className="lesson-code-explanation">
+
+                <h5>
+
+                  How this code works
+
+                </h5>
+
+
+
+                <div className="lesson-code-explanation-list">
+
+                  {example.explanation.map(
+
+                    (
+
+                      explanation,
+
+                      explanationIndex
+
+                    ) => (
+
+                      <div
+
+                        key={`${example.id}-explanation-${explanationIndex}`}
+
+                        className="lesson-code-explanation-item"
+
+                      >
+
+                        <span>
+
+                          {explanationIndex + 1}
+
+                        </span>
+
+
+
+                        <p>
+
+                          {explanation}
+
+                        </p>
+
+                      </div>
+
+                    )
+
+                  )}
+
+                </div>
+
+              </section>
+
+
+
+              {example.commonMistakes &&
+
+                example.commonMistakes.length >
+
+                  0 && (
+
+                  <section className="lesson-code-mistakes">
+
+                    <h5>
+
+                      Common mistakes
+
+                    </h5>
+
+
+
+                    {example.commonMistakes.map(
+
+                      (
+
+                        mistake,
+
+                        mistakeIndex
+
+                      ) => (
+
+                        <div
+
+                          key={`${example.id}-mistake-${mistakeIndex}`}
+
+                          className="lesson-code-mistake"
+
+                        >
+
+                          <span>
+
+                            !
+
+                          </span>
+
+
+
+                          <p>
+
+                            {mistake}
+
+                          </p>
+
+                        </div>
+
+                      )
+
+                    )}
+
+                  </section>
+
+                )}
+
+
+
+              <div className="lesson-code-runtime-note">
+
+                <div>
+
+                  <strong>
+
+                    Try it yourself
+
+                  </strong>
+
+
+
+                  <p>
+
+                    When this roadmap is
+
+                    integrated into ModelMind,
+
+                    this example will open in
+
+                    the existing ModelMind
+
+                    notebook so you can edit
+
+                    and run the code directly.
+
+                  </p>
+
+                </div>
+
+
+
+                <button
+
+                  type="button"
+
+                  disabled
+
+                  title="Available after ModelMind notebook integration"
+
+                >
+
+                  Open in Notebook
+
+                </button>
+
+              </div>
+
+            </article>
+
+          )
+
+        )}
+
+      </div>
+
+    ) : (
+
+      <div className="lesson-empty-state">
+
+        No guided code examples have been
+
+        added for this lesson yet.
+
+      </div>
+
+    )}
+
+      <div className="lesson-stage-completion">
+      <button
+        type="button"
+        className="day-complete-button"
+        disabled={codeCompleted}
+        onClick={onCodeComplete}
+      >
+        {codeCompleted
+          ? "Code Completed ✓"
+          : "Complete Code Stage"}
+      </button>
+    </div>
+
+</section>
+
+)}
+
+
+
+
+
+      {activeStage === "practice" && (
+
+  <RoadmapPracticeViewer
+  
+
+  problems={lesson.practice}
+
+  practiceCompleted={
+
+    practiceCompleted
+
+  }
+  completedProblemIds={
+  completedPracticeProblemIds
+}
+
+onProblemComplete={
+  onPracticeProblemComplete
+}
+
+  onPracticeComplete={
+
+    onPracticeComplete
+
+  }
+
+/>
+
+)}
+
+    </div>
+
+  );
+
+}
+
+============================================================
+FILE: D:\ModelMind_personalised\components\roadmap\RoadmapModelDeepDive.tsx
+============================================================
+
+"use client";
+
+import { useState } from "react";
+
+import type {
+  MLModelDeepDive,
+  LessonParameter,
+} from "../../types/roadmap";
+import RoadmapModelParameters
+  from "./RoadmapModelParameters";
+
+
+interface RoadmapModelDeepDiveProps {
+  deepDive: MLModelDeepDive;
+}
+
+
+type DeepDiveTab =
+  | "intuition"
+  | "algorithm"
+  | "mathematics"
+  | "parameters"
+  | "behavior"
+  | "data"
+  | "tuning"
+  | "comparison"
+  | "applications"
+  | "exam";
+
+
+const TABS: {
+  id: DeepDiveTab;
+  label: string;
+}[] = [
+  {
+    id: "intuition",
+    label: "Intuition",
+  },
+  {
+    id: "algorithm",
+    label: "How It Works",
+  },
+  {
+    id: "mathematics",
+    label: "Mathematics",
+  },
+  {
+    id: "parameters",
+    label: "Parameters",
+  },
+  {
+    id: "behavior",
+    label: "Model Behavior",
+  },
+  {
+    id: "data",
+    label: "Data & Preprocessing",
+  },
+  {
+    id: "tuning",
+    label: "Tuning",
+  },
+  {
+    id: "comparison",
+    label: "Comparisons",
+  },
+  {
+    id: "applications",
+    label: "Applications",
+  },
+  {
+    id: "exam",
+    label: "Exam & Interview",
+  },
+];
+
+
+function StringList({
+  items,
+}: {
+  items?: string[];
+}) {
+  if (!items || items.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="model-deep-list">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`}>
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+
+function InformationBlock({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="model-deep-info-block">
+      <h5>{title}</h5>
+
+      <div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+
+function ParameterCard({
+  parameter,
+}: {
+  parameter: LessonParameter;
+}) {
+  const [
+    expanded,
+    setExpanded,
+  ] = useState(false);
+
+  return (
+    <article className="model-parameter-card">
+      <button
+        type="button"
+        className="model-parameter-header"
+        onClick={() =>
+          setExpanded(
+            (current) => !current
+          )
+        }
+        aria-expanded={expanded}
+      >
+        <div>
+          <span className="model-parameter-category">
+            {parameter.category ??
+              "parameter"}
+          </span>
+
+          <h5>
+            {parameter.displayName ??
+              parameter.name}
+          </h5>
+
+          <p>
+            {parameter.description}
+          </p>
+        </div>
+
+        <span className="model-parameter-toggle">
+          {expanded ? "−" : "+"}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="model-parameter-body">
+          <InformationBlock title="Intuition">
+            <p>
+              {parameter.intuition}
+            </p>
+          </InformationBlock>
+
+          {(parameter.defaultValue ||
+            parameter.acceptedValues) && (
+            <div className="model-parameter-summary-grid">
+              {parameter.defaultValue && (
+                <div>
+                  <span>
+                    DEFAULT
+                  </span>
+
+                  <strong>
+                    {
+                      parameter.defaultValue
+                    }
+                  </strong>
+                </div>
+              )}
+
+              {parameter.acceptedValues && (
+                <div>
+                  <span>
+                    ACCEPTED VALUES
+                  </span>
+
+                  <strong>
+                    {
+                      parameter.acceptedValues
+                    }
+                  </strong>
+                </div>
+              )}
+            </div>
+          )}
+
+          {parameter.mathematicalMeaning && (
+            <InformationBlock title="Mathematical meaning">
+              <p>
+                {
+                  parameter.mathematicalMeaning
+                }
+              </p>
+            </InformationBlock>
+          )}
+
+          <div className="model-parameter-effect-grid">
+            {parameter.lowValueEffect &&
+              parameter.lowValueEffect
+                .length > 0 && (
+                <InformationBlock title="Lower value">
+                  <StringList
+                    items={
+                      parameter.lowValueEffect
+                    }
+                  />
+                </InformationBlock>
+              )}
+
+            {parameter.highValueEffect &&
+              parameter.highValueEffect
+                .length > 0 && (
+                <InformationBlock title="Higher value">
+                  <StringList
+                    items={
+                      parameter.highValueEffect
+                    }
+                  />
+                </InformationBlock>
+              )}
+          </div>
+
+          {(parameter.biasEffect ||
+            parameter.varianceEffect ||
+            parameter.overfittingEffect ||
+            parameter.underfittingEffect) && (
+            <div className="model-parameter-behavior-grid">
+              {parameter.biasEffect && (
+                <div>
+                  <span>BIAS</span>
+
+                  <p>
+                    {
+                      parameter.biasEffect
+                    }
+                  </p>
+                </div>
+              )}
+
+              {parameter.varianceEffect && (
+                <div>
+                  <span>
+                    VARIANCE
+                  </span>
+
+                  <p>
+                    {
+                      parameter.varianceEffect
+                    }
+                  </p>
+                </div>
+              )}
+
+              {parameter.overfittingEffect && (
+                <div>
+                  <span>
+                    OVERFITTING
+                  </span>
+
+                  <p>
+                    {
+                      parameter.overfittingEffect
+                    }
+                  </p>
+                </div>
+              )}
+
+              {parameter.underfittingEffect && (
+                <div>
+                  <span>
+                    UNDERFITTING
+                  </span>
+
+                  <p>
+                    {
+                      parameter.underfittingEffect
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {parameter.computationalEffect && (
+            <InformationBlock title="Computational effect">
+              <p>
+                {
+                  parameter.computationalEffect
+                }
+              </p>
+            </InformationBlock>
+          )}
+
+          {parameter.memoryEffect && (
+            <InformationBlock title="Memory effect">
+              <p>
+                {parameter.memoryEffect}
+              </p>
+            </InformationBlock>
+          )}
+
+          {parameter.whenToIncrease &&
+            parameter.whenToIncrease
+              .length > 0 && (
+              <InformationBlock title="When to increase it">
+                <StringList
+                  items={
+                    parameter.whenToIncrease
+                  }
+                />
+              </InformationBlock>
+            )}
+
+          {parameter.whenToDecrease &&
+            parameter.whenToDecrease
+              .length > 0 && (
+              <InformationBlock title="When to decrease it">
+                <StringList
+                  items={
+                    parameter.whenToDecrease
+                  }
+                />
+              </InformationBlock>
+            )}
+
+          {parameter.whenToTune &&
+            parameter.whenToTune.length >
+              0 && (
+              <InformationBlock title="When to tune it">
+                <StringList
+                  items={
+                    parameter.whenToTune
+                  }
+                />
+              </InformationBlock>
+            )}
+
+          {parameter.whenNotToTune &&
+            parameter.whenNotToTune
+              .length > 0 && (
+              <InformationBlock title="When not to focus on it">
+                <StringList
+                  items={
+                    parameter.whenNotToTune
+                  }
+                />
+              </InformationBlock>
+            )}
+
+          {parameter.tuningStrategy &&
+            parameter.tuningStrategy
+              .length > 0 && (
+              <InformationBlock title="Tuning strategy">
+                <StringList
+                  items={
+                    parameter.tuningStrategy
+                  }
+                />
+              </InformationBlock>
+            )}
+
+          {parameter.recommendedValues &&
+            parameter.recommendedValues
+              .length > 0 && (
+              <InformationBlock title="Useful values to explore">
+                <StringList
+                  items={
+                    parameter.recommendedValues
+                  }
+                />
+              </InformationBlock>
+            )}
+
+          {parameter.interactions &&
+            parameter.interactions.length >
+              0 && (
+              <InformationBlock title="Parameter interactions">
+                <div className="model-parameter-interactions">
+                  {parameter.interactions.map(
+                    (
+                      interaction,
+                      index
+                    ) => (
+                      <div
+                        key={`${parameter.id}-interaction-${index}`}
+                      >
+                        <strong>
+                          {
+                            interaction.parameter
+                          }
+                        </strong>
+
+                        <p>
+                          {
+                            interaction.explanation
+                          }
+                        </p>
+                      </div>
+                    )
+                  )}
+                </div>
+              </InformationBlock>
+            )}
+
+          {parameter.commonMistakes &&
+            parameter.commonMistakes
+              .length > 0 && (
+              <InformationBlock title="Common mistakes">
+                <StringList
+                  items={
+                    parameter.commonMistakes
+                  }
+                />
+              </InformationBlock>
+            )}
+
+          {parameter.examNotes &&
+            parameter.examNotes.length >
+              0 && (
+              <InformationBlock title="Exam notes">
+                <StringList
+                  items={
+                    parameter.examNotes
+                  }
+                />
+              </InformationBlock>
+            )}
+
+          {parameter.interviewNotes &&
+            parameter.interviewNotes
+              .length > 0 && (
+              <InformationBlock title="Interview notes">
+                <StringList
+                  items={
+                    parameter.interviewNotes
+                  }
+                />
+              </InformationBlock>
+            )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+
+export default function RoadmapModelDeepDive({
+  deepDive,
+}: RoadmapModelDeepDiveProps) {
+  const [
+    activeTab,
+    setActiveTab,
+  ] = useState<DeepDiveTab>(
+    "intuition"
+  );
+
+  return (
+    <section className="model-deep-dive">
+      <header className="model-deep-header">
+        <div>
+          <span className="roadmap-section-label">
+            MODEL DEEP DIVE
+          </span>
+
+          <h4>
+            Understand the model,
+            not just the API
+          </h4>
+
+          <p>
+            Learn why the model works,
+            how it learns, how its
+            parameters change its
+            behaviour, and when you
+            should or should not use it.
+          </p>
+        </div>
+
+        <div className="model-deep-meta">
+          <span>
+            {deepDive.modelFamily}
+          </span>
+
+          <span>
+            {deepDive.depth}
+          </span>
+        </div>
+      </header>
+
+      <div className="model-deep-problem-types">
+        {deepDive.problemTypes.map(
+          (type) => (
+            <span key={type}>
+              {type}
+            </span>
+          )
+        )}
+      </div>
+
+      <nav
+        className="model-deep-tabs"
+        aria-label="Model deep dive sections"
+      >
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={
+              activeTab === tab.id
+                ? "model-deep-tab model-deep-tab-active"
+                : "model-deep-tab"
+            }
+            onClick={() =>
+              setActiveTab(tab.id)
+            }
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="model-deep-content">
+        {activeTab === "intuition" && (
+          <>
+            <InformationBlock title="Why this model exists">
+              <StringList
+                items={
+                  deepDive.motivation
+                }
+              />
+            </InformationBlock>
+
+            <InformationBlock title="Core intuition">
+              <StringList
+                items={
+                  deepDive.intuition
+                }
+              />
+            </InformationBlock>
+
+            {deepDive.mentalModel &&
+              deepDive.mentalModel.length >
+                0 && (
+                <InformationBlock title="Mental model">
+                  <StringList
+                    items={
+                      deepDive.mentalModel
+                    }
+                  />
+                </InformationBlock>
+              )}
+
+            <div className="model-deep-two-column">
+              <InformationBlock title="Advantages">
+                <StringList
+                  items={
+                    deepDive.advantages
+                  }
+                />
+              </InformationBlock>
+
+              <InformationBlock title="Limitations">
+                <StringList
+                  items={
+                    deepDive.limitations
+                  }
+                />
+              </InformationBlock>
+            </div>
+
+            <div className="model-deep-two-column">
+              <InformationBlock title="When to use it">
+                <StringList
+                  items={
+                    deepDive.whenToUse
+                  }
+                />
+              </InformationBlock>
+
+              <InformationBlock title="When not to use it">
+                <StringList
+                  items={
+                    deepDive.whenNotToUse
+                  }
+                />
+              </InformationBlock>
+            </div>
+          </>
+        )}
+
+        {activeTab === "algorithm" && (
+          <>
+            <InformationBlock title="Training — step by step">
+              <div className="model-algorithm-steps">
+                {deepDive.trainingProcess.map(
+                  (step) => (
+                    <article
+                      key={step.id}
+                      className="model-algorithm-step"
+                    >
+                      <span>
+                        {String(
+                          step.step
+                        ).padStart(
+                          2,
+                          "0"
+                        )}
+                      </span>
+
+                      <div>
+                        <h5>
+                          {step.title}
+                        </h5>
+
+                        <p>
+                          {
+                            step.explanation
+                          }
+                        </p>
+
+                        {step.intuition && (
+                          <p className="model-step-intuition">
+                            <strong>
+                              Intuition:
+                            </strong>{" "}
+                            {
+                              step.intuition
+                            }
+                          </p>
+                        )}
+
+                        {step.mathematics && (
+                          <div className="model-step-math">
+                            {
+                              step.mathematics
+                            }
+                          </div>
+                        )}
+
+                        {step.example && (
+                          <p>
+                            <strong>
+                              Example:
+                            </strong>{" "}
+                            {step.example}
+                          </p>
+                        )}
+
+                        <StringList
+                          items={
+                            step.importantPoints
+                          }
+                        />
+                      </div>
+                    </article>
+                  )
+                )}
+              </div>
+            </InformationBlock>
+
+            {deepDive.predictionProcess &&
+              deepDive.predictionProcess
+                .length > 0 && (
+                <InformationBlock title="Prediction — what happens after training?">
+                  <div className="model-algorithm-steps">
+                    {deepDive.predictionProcess.map(
+                      (step) => (
+                        <article
+                          key={
+                            step.id
+                          }
+                          className="model-algorithm-step"
+                        >
+                          <span>
+                            {String(
+                              step.step
+                            ).padStart(
+                              2,
+                              "0"
+                            )}
+                          </span>
+
+                          <div>
+                            <h5>
+                              {
+                                step.title
+                              }
+                            </h5>
+
+                            <p>
+                              {
+                                step.explanation
+                              }
+                            </p>
+
+                            {step.intuition && (
+                              <p className="model-step-intuition">
+                                {
+                                  step.intuition
+                                }
+                              </p>
+                            )}
+                          </div>
+                        </article>
+                      )
+                    )}
+                  </div>
+                </InformationBlock>
+              )}
+          </>
+        )}
+
+        {activeTab ===
+          "mathematics" && (
+          <>
+            {deepDive.mathematics &&
+            deepDive.mathematics.length >
+              0 ? (
+              deepDive.mathematics.map(
+                (math, index) => (
+                  <InformationBlock
+                    key={`deep-math-${index}`}
+                    title={
+                      math.title ??
+                      `Mathematics ${
+                        index + 1
+                      }`
+                    }
+                  >
+                    <p>
+                      {
+                        math.explanation
+                      }
+                    </p>
+
+                    {math.formula && (
+                      <div className="lesson-formula">
+                        {
+                          math.formula
+                        }
+                      </div>
+                    )}
+
+                    {math.variables &&
+                      math.variables
+                        .length > 0 && (
+                        <div className="lesson-math-variables">
+                          {math.variables.map(
+                            (
+                              variable,
+                              variableIndex
+                            ) => (
+                              <div
+                                key={`deep-math-variable-${index}-${variableIndex}`}
+                                className="lesson-math-variable"
+                              >
+                                <strong>
+                                  {
+                                    variable.symbol
+                                  }
+                                </strong>
+
+                                <span>
+                                  {
+                                    variable.meaning
+                                  }
+                                </span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+
+                    {math.example && (
+                      <div className="lesson-math-example">
+                        <strong>
+                          Example
+                        </strong>
+
+                        <p>
+                          {
+                            math.example
+                          }
+                        </p>
+                      </div>
+                    )}
+                  </InformationBlock>
+                )
+              )
+            ) : (
+              <p>
+                Additional mathematical
+                detail is not required for
+                this model.
+              </p>
+            )}
+
+            {deepDive.objectiveFunctions?.map(
+              (
+                objective,
+                index
+              ) => (
+                <InformationBlock
+                  key={`objective-${index}`}
+                  title={
+                    objective.name
+                  }
+                >
+                  <p>
+                    {
+                      objective.purpose
+                    }
+                  </p>
+
+                  <StringList
+                    items={
+                      objective.intuition
+                    }
+                  />
+
+                  {objective.formula && (
+                    <div className="lesson-formula">
+                      {
+                        objective.formula
+                      }
+                    </div>
+                  )}
+
+                  <StringList
+                    items={
+                      objective.explanation
+                    }
+                  />
+
+                  {objective.practicalMeaning &&
+                    objective
+                      .practicalMeaning
+                      .length > 0 && (
+                      <>
+                        <h6>
+                          Practical meaning
+                        </h6>
+
+                        <StringList
+                          items={
+                            objective.practicalMeaning
+                          }
+                        />
+                      </>
+                    )}
+                </InformationBlock>
+              )
+            )}
+          </>
+        )}
+
+        {activeTab === "parameters" && (
+  <RoadmapModelParameters
+    modelName={deepDive.modelFamily}
+    parameters={deepDive.parameters}
+    fitParameters={
+      deepDive.modelFamily ===
+      "Linear Models / Regression"
+        ? [
+            {
+              id: "lr-fit-sample-weight",
+              name: "sample_weight",
+              displayName:
+                "Sample Weight",
+              type:
+                "array-like of shape (n_samples,), optional",
+              defaultValue: "None",
+              description:
+                "Provides an individual weight for each training sample when fitting Linear Regression.",
+              intuition:
+                "Normally every training row contributes equally to the least-squares objective. sample_weight lets some observations contribute more strongly than others.",
+              whenToUse: [
+                "When observations should have different importance.",
+                "When reliability or exposure differs between observations and weighting is justified by the problem.",
+                "When the learning objective intentionally requires weighted least squares.",
+              ],
+              importantPoints: [
+                "sample_weight is passed to fit(...); it is not a LinearRegression constructor hyperparameter.",
+                "Larger sample weights make the corresponding observations contribute more strongly to fitting.",
+                "Weighting changes the fitted least-squares objective.",
+              ],
+              commonMistakes: [
+                "Treating sample_weight as a constructor parameter.",
+                "Using arbitrary weights without understanding what they represent.",
+                "Using sample weights to hide poor-quality data instead of investigating it.",
+              ],
+            },
+          ]
+        : []
+    }
+    learnedAttributes={
+      deepDive.modelFamily ===
+      "Linear Models / Regression"
+        ? [
+            {
+              id: "lr-attribute-coef",
+              name: "coef_",
+              displayName:
+                "Learned Coefficients",
+              type:
+                "array of shape (n_features,) or (n_targets, n_features)",
+              description:
+                "Contains the feature coefficients learned during model fitting.",
+              interpretation: [
+                "The sign indicates the direction of the fitted linear relationship.",
+                "A positive coefficient increases the prediction as that feature increases, holding the other modeled features fixed.",
+                "A negative coefficient decreases the prediction as that feature increases.",
+                "Magnitude depends on feature units, so raw coefficient sizes should not be compared carelessly across differently scaled features.",
+              ],
+              importantPoints: [
+                "coef_ is learned from data.",
+                "It is not supplied before training.",
+                "Multicollinearity can make individual coefficients unstable.",
+              ],
+            },
+
+            {
+              id: "lr-attribute-intercept",
+              name: "intercept_",
+              displayName:
+                "Learned Intercept",
+              type:
+                "float or array",
+              description:
+                "Contains the intercept learned by the fitted regression model.",
+              interpretation: [
+                "It represents the model prediction when all input features are zero.",
+                "Its practical meaning depends on whether zero is meaningful for the features.",
+              ],
+              importantPoints: [
+                "When fit_intercept=false, the model does not independently estimate a normal intercept term.",
+                "The intercept should not automatically be interpreted as meaningful if zero lies outside the realistic feature range.",
+              ],
+            },
+
+            {
+              id: "lr-attribute-rank",
+              name: "rank_",
+              displayName:
+                "Design Matrix Rank",
+              type: "integer",
+              description:
+                "Reports the rank of the feature matrix for supported dense-input fitting.",
+              interpretation: [
+                "Rank describes the number of linearly independent directions represented by the design matrix.",
+                "Rank deficiency can indicate exact linear dependence among features.",
+              ],
+              importantPoints: [
+                "This is a diagnostic learned attribute, not a tuning parameter.",
+                "It is associated with dense-input fitting.",
+              ],
+            },
+
+            {
+              id: "lr-attribute-singular",
+              name: "singular_",
+              displayName:
+                "Singular Values",
+              type:
+                "array of shape (min(X.shape),)",
+              description:
+                "Contains singular values of the feature matrix for supported dense-input fitting.",
+              interpretation: [
+                "Singular values provide information about the numerical structure of the design matrix.",
+                "Very small singular values can be associated with poorly conditioned or nearly dependent feature directions.",
+              ],
+              importantPoints: [
+                "This is not a model hyperparameter.",
+                "It can help advanced users reason about matrix conditioning.",
+              ],
+            },
+
+            {
+              id: "lr-attribute-n-features",
+              name: "n_features_in_",
+              displayName:
+                "Number of Input Features",
+              type: "integer",
+              description:
+                "Stores the number of features observed by the estimator during fitting.",
+              interpretation: [
+                "If the training matrix contained five predictor columns, n_features_in_ is normally 5.",
+              ],
+              importantPoints: [
+                "Useful for estimator validation and inspection.",
+                "It is learned metadata, not a tunable parameter.",
+              ],
+            },
+
+            {
+              id: "lr-attribute-feature-names",
+              name: "feature_names_in_",
+              displayName:
+                "Input Feature Names",
+              type:
+                "array of shape (n_features_in_,)",
+              description:
+                "Stores input feature names when the estimator was fitted with supported named feature input.",
+              interpretation: [
+                "Helps connect learned coefficients and estimator behavior back to the original named columns.",
+              ],
+              importantPoints: [
+                "Available when suitable feature names were supplied during fitting.",
+                "It is estimator metadata, not a hyperparameter.",
+              ],
+            },
+          ]
+        : []
+    }
+    tuningSummary={
+      deepDive.modelFamily ===
+      "Linear Models / Regression"
+        ? {
+            tuneFirst: [
+              "LinearRegression has very few predictive hyperparameters.",
+              "Focus first on feature quality, leakage prevention, functional form and validation.",
+              "Consider positive only when non-negative coefficients are genuinely required by the problem.",
+              "Consider solver tolerance only when numerical behavior makes it relevant.",
+              "If regularization strength needs tuning, compare Ridge, Lasso or Elastic Net rather than inventing a LinearRegression regularization parameter.",
+            ],
+
+            usuallyLeaveDefault: [
+              "fit_intercept=true for most ordinary regression problems.",
+              "copy_X=true unless memory/data-handling requirements justify changing it.",
+              "n_jobs is mainly a computational setting rather than a predictive-performance parameter.",
+            ],
+
+            notHyperparameters: [
+              "coef_",
+              "intercept_",
+              "rank_",
+              "singular_",
+              "n_features_in_",
+              "feature_names_in_",
+              "sample_weight — this is a fit argument rather than a constructor hyperparameter.",
+            ],
+          }
+        : undefined
+    }
+  />
+)}
+
+        {activeTab === "behavior" && (
+          <>
+            {deepDive.biasVariance && (
+              <InformationBlock title="Bias–variance behavior">
+                <div className="model-bias-variance-summary">
+                  <div>
+                    <span>BIAS</span>
+                    <strong>
+                      {
+                        deepDive
+                          .biasVariance
+                          .bias
+                      }
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      VARIANCE
+                    </span>
+                    <strong>
+                      {
+                        deepDive
+                          .biasVariance
+                          .variance
+                      }
+                    </strong>
+                  </div>
+                </div>
+
+                <StringList
+                  items={
+                    deepDive
+                      .biasVariance
+                      .explanation
+                  }
+                />
+
+                <h6>
+                  Causes of
+                  underfitting
+                </h6>
+
+                <StringList
+                  items={
+                    deepDive
+                      .biasVariance
+                      .underfittingCauses
+                  }
+                />
+
+                <h6>
+                  Causes of overfitting
+                </h6>
+
+                <StringList
+                  items={
+                    deepDive
+                      .biasVariance
+                      .overfittingCauses
+                  }
+                />
+
+                <h6>
+                  Reduce underfitting
+                </h6>
+
+                <StringList
+                  items={
+                    deepDive
+                      .biasVariance
+                      .reduceUnderfitting
+                  }
+                />
+
+                <h6>
+                  Reduce overfitting
+                </h6>
+
+                <StringList
+                  items={
+                    deepDive
+                      .biasVariance
+                      .reduceOverfitting
+                  }
+                />
+              </InformationBlock>
+            )}
+
+            {deepDive.complexity && (
+              <InformationBlock title="Computational complexity">
+                <div className="model-complexity-grid">
+                  {deepDive.complexity
+                    .training && (
+                    <div>
+                      <span>
+                        TRAINING
+                      </span>
+
+                      <strong>
+                        {
+                          deepDive
+                            .complexity
+                            .training
+                        }
+                      </strong>
+                    </div>
+                  )}
+
+                  {deepDive.complexity
+                    .prediction && (
+                    <div>
+                      <span>
+                        PREDICTION
+                      </span>
+
+                      <strong>
+                        {
+                          deepDive
+                            .complexity
+                            .prediction
+                        }
+                      </strong>
+                    </div>
+                  )}
+
+                  {deepDive.complexity
+                    .memory && (
+                    <div>
+                      <span>
+                        MEMORY
+                      </span>
+
+                      <strong>
+                        {
+                          deepDive
+                            .complexity
+                            .memory
+                        }
+                      </strong>
+                    </div>
+                  )}
+                </div>
+
+                <StringList
+                  items={
+                    deepDive.complexity
+                      .explanation
+                  }
+                />
+
+                <StringList
+                  items={
+                    deepDive.complexity
+                      .scalabilityNotes
+                  }
+                />
+              </InformationBlock>
+            )}
+
+            {deepDive.failureModes &&
+              deepDive.failureModes
+                .length > 0 && (
+                <InformationBlock title="Failure modes & debugging">
+                  <div className="model-failure-list">
+                    {deepDive.failureModes.map(
+                      (failure) => (
+                        <article
+                          key={
+                            failure.id
+                          }
+                        >
+                          <h5>
+                            {
+                              failure.symptom
+                            }
+                          </h5>
+
+                          <h6>
+                            Likely causes
+                          </h6>
+
+                          <StringList
+                            items={
+                              failure.likelyCauses
+                            }
+                          />
+
+                          <h6>
+                            Diagnosis
+                          </h6>
+
+                          <StringList
+                            items={
+                              failure.diagnosis
+                            }
+                          />
+
+                          <h6>
+                            Fixes
+                          </h6>
+
+                          <StringList
+                            items={
+                              failure.fixes
+                            }
+                          />
+                        </article>
+                      )
+                    )}
+                  </div>
+                </InformationBlock>
+              )}
+          </>
+        )}
+
+        {activeTab === "data" && (
+          <>
+            {deepDive.dataRequirements ? (
+              <div className="model-data-requirements">
+                {deepDive.dataRequirements
+                  .scaling && (
+                  <InformationBlock title="Feature scaling">
+                    <strong>
+                      {deepDive
+                        .dataRequirements
+                        .scaling.required
+                        ? "Required / strongly recommended"
+                        : "Usually not required"}
+                    </strong>
+
+                    <p>
+                      {
+                        deepDive
+                          .dataRequirements
+                          .scaling
+                          .explanation
+                      }
+                    </p>
+                  </InformationBlock>
+                )}
+
+                {deepDive.dataRequirements
+                  .categoricalFeatures && (
+                  <InformationBlock title="Categorical features">
+                    <p>
+                      {
+                        deepDive
+                          .dataRequirements
+                          .categoricalFeatures
+                          .explanation
+                      }
+                    </p>
+
+                    <StringList
+                      items={
+                        deepDive
+                          .dataRequirements
+                          .categoricalFeatures
+                          .recommendations
+                      }
+                    />
+                  </InformationBlock>
+                )}
+
+                {deepDive.dataRequirements
+                  .missingValues && (
+                  <InformationBlock title="Missing values">
+                    <p>
+                      {
+                        deepDive
+                          .dataRequirements
+                          .missingValues
+                          .explanation
+                      }
+                    </p>
+
+                    <StringList
+                      items={
+                        deepDive
+                          .dataRequirements
+                          .missingValues
+                          .recommendations
+                      }
+                    />
+                  </InformationBlock>
+                )}
+
+                {deepDive.dataRequirements
+                  .outliers && (
+                  <InformationBlock title="Outliers">
+                    <strong>
+                      Sensitivity:{" "}
+                      {
+                        deepDive
+                          .dataRequirements
+                          .outliers
+                          .sensitivity
+                      }
+                    </strong>
+
+                    <p>
+                      {
+                        deepDive
+                          .dataRequirements
+                          .outliers
+                          .explanation
+                      }
+                    </p>
+
+                    <StringList
+                      items={
+                        deepDive
+                          .dataRequirements
+                          .outliers
+                          .recommendations
+                      }
+                    />
+                  </InformationBlock>
+                )}
+
+                {deepDive.dataRequirements
+                  .imbalance && (
+                  <InformationBlock title="Class imbalance">
+                    <strong>
+                      Sensitivity:{" "}
+                      {
+                        deepDive
+                          .dataRequirements
+                          .imbalance
+                          .sensitivity
+                      }
+                    </strong>
+
+                    <p>
+                      {
+                        deepDive
+                          .dataRequirements
+                          .imbalance
+                          .explanation
+                      }
+                    </p>
+
+                    <StringList
+                      items={
+                        deepDive
+                          .dataRequirements
+                          .imbalance
+                          .recommendations
+                      }
+                    />
+                  </InformationBlock>
+                )}
+
+                <InformationBlock title="Feature distribution">
+                  <StringList
+                    items={
+                      deepDive
+                        .dataRequirements
+                        .featureDistribution
+                    }
+                  />
+                </InformationBlock>
+
+                <InformationBlock title="Dataset size">
+                  <StringList
+                    items={
+                      deepDive
+                        .dataRequirements
+                        .sampleSizeConsiderations
+                    }
+                  />
+                </InformationBlock>
+
+                <InformationBlock title="High dimensional data">
+                  <StringList
+                    items={
+                      deepDive
+                        .dataRequirements
+                        .dimensionalityConsiderations
+                    }
+                  />
+                </InformationBlock>
+              </div>
+            ) : (
+              <p>
+                No special data
+                requirements are configured
+                for this lesson.
+              </p>
+            )}
+          </>
+        )}
+
+        {activeTab === "tuning" && (
+          <>
+            {deepDive.tuning ? (
+              <>
+                <InformationBlock title="Tuning strategy">
+                  <StringList
+                    items={
+                      deepDive.tuning
+                        .strategy
+                    }
+                  />
+                </InformationBlock>
+
+                <div className="model-deep-two-column">
+                  <InformationBlock title="Tune these first">
+                    <StringList
+                      items={
+                        deepDive.tuning
+                          .tuneFirst
+                      }
+                    />
+                  </InformationBlock>
+
+                  <InformationBlock title="Tune these later">
+                    <StringList
+                      items={
+                        deepDive.tuning
+                          .tuneLater
+                      }
+                    />
+                  </InformationBlock>
+                </div>
+
+                <InformationBlock title="Search-space guidance">
+                  <StringList
+                    items={
+                      deepDive.tuning
+                        .searchSpaceTips
+                    }
+                  />
+                </InformationBlock>
+
+                <InformationBlock title="Important parameter interactions">
+                  <StringList
+                    items={
+                      deepDive.tuning
+                        .parameterInteractions
+                    }
+                  />
+                </InformationBlock>
+
+                <InformationBlock title="Practical workflow">
+                  <StringList
+                    items={
+                      deepDive.tuning
+                        .practicalWorkflow
+                    }
+                  />
+                </InformationBlock>
+
+                {deepDive.tuning
+                  .gridSearchExample && (
+                  <InformationBlock title="GridSearchCV example">
+                    <pre>
+                      <code>
+                        {
+                          deepDive
+                            .tuning
+                            .gridSearchExample
+                        }
+                      </code>
+                    </pre>
+                  </InformationBlock>
+                )}
+
+                {deepDive.tuning
+                  .randomizedSearchExample && (
+                  <InformationBlock title="RandomizedSearchCV example">
+                    <pre>
+                      <code>
+                        {
+                          deepDive
+                            .tuning
+                            .randomizedSearchExample
+                        }
+                      </code>
+                    </pre>
+                  </InformationBlock>
+                )}
+              </>
+            ) : (
+              <p>
+                A dedicated tuning guide
+                has not been configured for
+                this model yet.
+              </p>
+            )}
+          </>
+        )}
+
+        {activeTab ===
+          "comparison" && (
+          <>
+            {deepDive.comparisons &&
+            deepDive.comparisons.length >
+              0 ? (
+              <div className="model-comparison-list">
+                {deepDive.comparisons.map(
+                  (
+                    comparison,
+                    index
+                  ) => (
+                    <article
+                      key={`${comparison.model}-${index}`}
+                      className="model-comparison-card"
+                    >
+                      <h5>
+                        vs.{" "}
+                        {
+                          comparison.model
+                        }
+                      </h5>
+
+                      {comparison.relationship && (
+                        <p>
+                          {
+                            comparison.relationship
+                          }
+                        </p>
+                      )}
+
+                      <h6>
+                        Differences
+                      </h6>
+
+                      <StringList
+                        items={
+                          comparison.differences
+                        }
+                      />
+
+                      <h6>
+                        Prefer this model
+                        when
+                      </h6>
+
+                      <StringList
+                        items={
+                          comparison.preferCurrentWhen
+                        }
+                      />
+
+                      <h6>
+                        Prefer{" "}
+                        {
+                          comparison.model
+                        }{" "}
+                        when
+                      </h6>
+
+                      <StringList
+                        items={
+                          comparison.preferOtherWhen
+                        }
+                      />
+
+                      {comparison.examTip && (
+                        <p className="model-comparison-exam-tip">
+                          <strong>
+                            Exam tip:
+                          </strong>{" "}
+                          {
+                            comparison.examTip
+                          }
+                        </p>
+                      )}
+                    </article>
+                  )
+                )}
+              </div>
+            ) : (
+              <p>
+                Model comparisons will be
+                added with the lesson
+                content.
+              </p>
+            )}
+          </>
+        )}
+
+        {activeTab ===
+          "applications" && (
+          <>
+            {deepDive.realWorldApplications &&
+            deepDive
+              .realWorldApplications
+              .length > 0 ? (
+              <div className="model-application-list">
+                {deepDive.realWorldApplications.map(
+                  (
+                    application,
+                    index
+                  ) => (
+                    <article
+                      key={`${application.title}-${index}`}
+                      className="model-application-card"
+                    >
+                      <span>
+                        {
+                          application.domain
+                        }
+                      </span>
+
+                      <h5>
+                        {
+                          application.title
+                        }
+                      </h5>
+
+                      <p>
+                        {
+                          application.problem
+                        }
+                      </p>
+
+                      {application.whyModelFits && (
+                        <p>
+                          <strong>
+                            Why it fits:
+                          </strong>{" "}
+                          {
+                            application.whyModelFits
+                          }
+                        </p>
+                      )}
+
+                      <StringList
+                        items={
+                          application.limitations
+                        }
+                      />
+                    </article>
+                  )
+                )}
+              </div>
+            ) : (
+              <p>
+                Real-world applications
+                will be provided with the
+                model content.
+              </p>
+            )}
+          </>
+        )}
+
+        {activeTab === "exam" && (
+          <>
+            {deepDive.examNotes &&
+              deepDive.examNotes.length >
+                0 && (
+                <InformationBlock title="Exam preparation">
+                  <div className="model-exam-notes">
+                    {deepDive.examNotes.map(
+                      (
+                        note,
+                        index
+                      ) => (
+                        <article
+                          key={`${note.title}-${index}`}
+                        >
+                          <h5>
+                            {
+                              note.title
+                            }
+                          </h5>
+
+                          <StringList
+                            items={
+                              note.points
+                            }
+                          />
+
+                          {note.formula && (
+                            <div className="lesson-formula">
+                              {
+                                note.formula
+                              }
+                            </div>
+                          )}
+
+                          {note.commonQuestion && (
+                            <p>
+                              <strong>
+                                Common
+                                question:
+                              </strong>{" "}
+                              {
+                                note.commonQuestion
+                              }
+                            </p>
+                          )}
+                        </article>
+                      )
+                    )}
+                  </div>
+                </InformationBlock>
+              )}
+
+            {deepDive.interviewQuestions &&
+              deepDive
+                .interviewQuestions
+                .length > 0 && (
+                <InformationBlock title="Interview questions">
+                  <div className="model-interview-list">
+                    {deepDive.interviewQuestions.map(
+                      (
+                        question,
+                        index
+                      ) => (
+                        <article
+                          key={`interview-${index}`}
+                        >
+                          <h5>
+                            Q
+                            {index +
+                              1}
+                            .{" "}
+                            {
+                              question.question
+                            }
+                          </h5>
+
+                          <p>
+                            <strong>
+                              Short
+                              answer:
+                            </strong>{" "}
+                            {
+                              question.shortAnswer
+                            }
+                          </p>
+
+                          <StringList
+                            items={
+                              question.deepAnswer
+                            }
+                          />
+
+                          {question.followUpQuestions &&
+                            question
+                              .followUpQuestions
+                              .length >
+                              0 && (
+                              <>
+                                <h6>
+                                  Follow-up
+                                  questions
+                                </h6>
+
+                                <StringList
+                                  items={
+                                    question.followUpQuestions
+                                  }
+                                />
+                              </>
+                            )}
+                        </article>
+                      )
+                    )}
+                  </div>
+                </InformationBlock>
+              )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+============================================================
+FILE: D:\ModelMind_personalised\components\roadmap\RoadmapModelParameters.tsx
+============================================================
+
+"use client";
+
+import {
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+
+import type {
+  LessonParameter,
+} from "../../types/roadmap";
+
+
+// =========================================================
+// TYPES
+// =========================================================
+
+interface ModelFitParameter {
+  id: string;
+  name: string;
+  displayName: string;
+  type: string;
+  defaultValue?: string;
+  description: string;
+  intuition: string;
+  whenToUse?: string[];
+  importantPoints?: string[];
+  commonMistakes?: string[];
+}
+
+interface ModelLearnedAttribute {
+  id: string;
+  name: string;
+  displayName: string;
+  type?: string;
+  description: string;
+  interpretation?: string[];
+  importantPoints?: string[];
+}
+
+interface RoadmapModelParametersProps {
+  modelName: string;
+
+  parameters: LessonParameter[];
+
+  fitParameters?: ModelFitParameter[];
+
+  learnedAttributes?: ModelLearnedAttribute[];
+
+  tuningSummary?: {
+    tuneFirst?: string[];
+    usuallyLeaveDefault?: string[];
+    notHyperparameters?: string[];
+  };
+}
+
+
+// =========================================================
+// HELPERS
+// =========================================================
+
+function TextList({
+  items,
+}: {
+  items?: string[];
+}) {
+  if (!items || items.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="model-param-list">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`}>
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+
+function DetailBlock({
+  title,
+  children,
+  full = false,
+}: {
+  title: string;
+  children: ReactNode;
+  full?: boolean;
+}) {
+  return (
+    <div
+      className={
+        full
+          ? "model-param-detail model-param-detail-full"
+          : "model-param-detail"
+      }
+    >
+      <span className="model-param-detail-label">
+        {title}
+      </span>
+
+      <div className="model-param-detail-content">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+// =========================================================
+// MODEL PARAMETER CARD
+// =========================================================
+
+function ModelParameterCard({
+  parameter,
+}: {
+  parameter: LessonParameter;
+}) {
+  const [expanded, setExpanded] =
+    useState(false);
+
+  return (
+    <article
+      className={
+        expanded
+          ? "model-param-card model-param-card-expanded"
+          : "model-param-card"
+      }
+    >
+      <button
+        type="button"
+        className="model-param-card-header"
+        onClick={() =>
+          setExpanded(
+            (current) => !current
+          )
+        }
+      >
+        <div className="model-param-card-heading">
+          <div className="model-param-card-topline">
+            <code>
+              {parameter.name}
+            </code>
+
+            {parameter.category && (
+              <span className="model-param-category">
+                {parameter.category}
+              </span>
+            )}
+          </div>
+
+          <h4>
+            {parameter.displayName ??
+              parameter.name}
+          </h4>
+
+          <p>
+            {parameter.description}
+          </p>
+        </div>
+
+        <span className="model-param-expand">
+          {expanded ? "−" : "+"}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="model-param-card-body">
+
+          {/* QUICK FACTS */}
+
+          <div className="model-param-quick-grid">
+
+            {parameter.defaultValue && (
+              <div>
+                <span>
+                  DEFAULT
+                </span>
+
+                <strong>
+                  {parameter.defaultValue}
+                </strong>
+              </div>
+            )}
+
+            {parameter.acceptedValues && (
+              <div>
+                <span>
+                  ACCEPTED VALUES
+                </span>
+
+                <strong>
+                  {parameter.acceptedValues}
+                </strong>
+              </div>
+            )}
+
+            {parameter.category && (
+              <div>
+                <span>
+                  CATEGORY
+                </span>
+
+                <strong>
+                  {parameter.category}
+                </strong>
+              </div>
+            )}
+
+          </div>
+
+
+          {/* INTUITION */}
+
+          <DetailBlock
+            title="Intuition"
+            full
+          >
+            <p>
+              {parameter.intuition}
+            </p>
+          </DetailBlock>
+
+
+          {/* MATHEMATICAL MEANING */}
+
+          {parameter.mathematicalMeaning && (
+            <DetailBlock
+              title="Mathematical meaning"
+              full
+            >
+              <p className="model-param-math">
+                {
+                  parameter.mathematicalMeaning
+                }
+              </p>
+            </DetailBlock>
+          )}
+
+
+          {/* LOW / HIGH */}
+
+          {(parameter.lowValueEffect ||
+            parameter.highValueEffect) && (
+            <div className="model-param-two-column">
+
+              {parameter.lowValueEffect && (
+                <DetailBlock title="Lower value / disabled">
+                  <TextList
+                    items={
+                      parameter.lowValueEffect
+                    }
+                  />
+                </DetailBlock>
+              )}
+
+              {parameter.highValueEffect && (
+                <DetailBlock title="Higher value / enabled">
+                  <TextList
+                    items={
+                      parameter.highValueEffect
+                    }
+                  />
+                </DetailBlock>
+              )}
+
+            </div>
+          )}
+
+
+          {/* MODEL BEHAVIOUR */}
+
+          <div className="model-param-behavior-grid">
+
+            {parameter.biasEffect && (
+              <DetailBlock title="Bias">
+                <p>
+                  {parameter.biasEffect}
+                </p>
+              </DetailBlock>
+            )}
+
+            {parameter.varianceEffect && (
+              <DetailBlock title="Variance">
+                <p>
+                  {parameter.varianceEffect}
+                </p>
+              </DetailBlock>
+            )}
+
+            {parameter.overfittingEffect && (
+              <DetailBlock title="Overfitting">
+                <p>
+                  {
+                    parameter.overfittingEffect
+                  }
+                </p>
+              </DetailBlock>
+            )}
+
+            {parameter.underfittingEffect && (
+              <DetailBlock title="Underfitting">
+                <p>
+                  {
+                    parameter.underfittingEffect
+                  }
+                </p>
+              </DetailBlock>
+            )}
+
+          </div>
+
+
+          {/* COMPUTATION */}
+
+          {(parameter.computationalEffect ||
+            parameter.memoryEffect) && (
+            <div className="model-param-two-column">
+
+              {parameter.computationalEffect && (
+                <DetailBlock title="Computation">
+                  <p>
+                    {
+                      parameter.computationalEffect
+                    }
+                  </p>
+                </DetailBlock>
+              )}
+
+              {parameter.memoryEffect && (
+                <DetailBlock title="Memory">
+                  <p>
+                    {
+                      parameter.memoryEffect
+                    }
+                  </p>
+                </DetailBlock>
+              )}
+
+            </div>
+          )}
+
+
+          {/* WHEN TO CHANGE */}
+
+          {(parameter.whenToIncrease ||
+            parameter.whenToDecrease) && (
+            <div className="model-param-two-column">
+
+              {parameter.whenToIncrease && (
+                <DetailBlock title="When to increase / enable">
+                  <TextList
+                    items={
+                      parameter.whenToIncrease
+                    }
+                  />
+                </DetailBlock>
+              )}
+
+              {parameter.whenToDecrease && (
+                <DetailBlock title="When to decrease / disable">
+                  <TextList
+                    items={
+                      parameter.whenToDecrease
+                    }
+                  />
+                </DetailBlock>
+              )}
+
+            </div>
+          )}
+
+
+          {/* TUNING */}
+
+          {parameter.whenToTune && (
+            <DetailBlock
+              title="When should I tune this?"
+              full
+            >
+              <TextList
+                items={
+                  parameter.whenToTune
+                }
+              />
+            </DetailBlock>
+          )}
+
+          {parameter.whenNotToTune && (
+            <DetailBlock
+              title="When should I leave it alone?"
+              full
+            >
+              <TextList
+                items={
+                  parameter.whenNotToTune
+                }
+              />
+            </DetailBlock>
+          )}
+
+          {parameter.tuningStrategy && (
+            <DetailBlock
+              title="Practical tuning strategy"
+              full
+            >
+              <TextList
+                items={
+                  parameter.tuningStrategy
+                }
+              />
+            </DetailBlock>
+          )}
+
+          {parameter.recommendedValues && (
+            <DetailBlock
+              title="Recommended values / starting point"
+              full
+            >
+              <TextList
+                items={
+                  parameter.recommendedValues
+                }
+              />
+            </DetailBlock>
+          )}
+
+
+          {/* INTERACTIONS */}
+
+          {parameter.interactions &&
+            parameter.interactions.length >
+              0 && (
+              <DetailBlock
+                title="Parameter interactions"
+                full
+              >
+                <div className="model-param-interactions">
+                  {parameter.interactions.map(
+                    (
+                      interaction,
+                      index
+                    ) => (
+                      <div
+                        key={`${interaction.parameter}-${index}`}
+                      >
+                        <strong>
+                          {
+                            interaction.parameter
+                          }
+                        </strong>
+
+                        <p>
+                          {
+                            interaction.explanation
+                          }
+                        </p>
+                      </div>
+                    )
+                  )}
+                </div>
+              </DetailBlock>
+            )}
+
+
+          {/* COMMON MISTAKES */}
+
+          {parameter.commonMistakes && (
+            <DetailBlock
+              title="Common mistakes"
+              full
+            >
+              <TextList
+                items={
+                  parameter.commonMistakes
+                }
+              />
+            </DetailBlock>
+          )}
+
+
+          {/* EXAM */}
+
+          {parameter.examNotes && (
+            <DetailBlock
+              title="Exam notes"
+              full
+            >
+              <TextList
+                items={
+                  parameter.examNotes
+                }
+              />
+            </DetailBlock>
+          )}
+
+
+          {/* INTERVIEW */}
+
+          {parameter.interviewNotes && (
+            <DetailBlock
+              title="Interview notes"
+              full
+            >
+              <TextList
+                items={
+                  parameter.interviewNotes
+                }
+              />
+            </DetailBlock>
+          )}
+
+        </div>
+      )}
+    </article>
+  );
+}
+
+
+// =========================================================
+// MAIN COMPONENT
+// =========================================================
+
+export default function RoadmapModelParameters({
+  modelName,
+  parameters,
+  fitParameters = [],
+  learnedAttributes = [],
+  tuningSummary,
+}: RoadmapModelParametersProps) {
+
+  const [search, setSearch] =
+    useState("");
+
+  const [activeSection, setActiveSection] =
+    useState<
+      | "model"
+      | "fit"
+      | "attributes"
+    >("model");
+
+
+  const filteredParameters =
+    useMemo(() => {
+      const query =
+        search.trim().toLowerCase();
+
+      if (!query) {
+        return parameters;
+      }
+
+      return parameters.filter(
+        (parameter) =>
+          parameter.name
+            .toLowerCase()
+            .includes(query) ||
+          (
+            parameter.displayName ?? ""
+          )
+            .toLowerCase()
+            .includes(query) ||
+          parameter.description
+            .toLowerCase()
+            .includes(query)
+      );
+    }, [parameters, search]);
+
+
+  return (
+    <section className="model-parameters-page">
+
+      {/* HEADER */}
+
+      <header className="model-parameters-page-header">
+
+        <div>
+          <span className="model-parameters-eyebrow">
+            PARAMETER ENCYCLOPEDIA
+          </span>
+
+          <h3>
+            {modelName} Parameters
+          </h3>
+
+          <p>
+            Understand what every important
+            parameter actually controls,
+            when it matters, how it affects
+            the model, and whether you
+            should tune it.
+          </p>
+        </div>
+
+        <div className="model-parameters-count">
+          <strong>
+            {parameters.length}
+          </strong>
+
+          <span>
+            model parameters
+          </span>
+        </div>
+
+      </header>
+
+
+      {/* IMPORTANT DISTINCTION */}
+
+      <div className="model-param-definition-grid">
+
+        <article>
+          <span>
+            MODEL PARAMETERS
+          </span>
+
+          <h4>
+            Set before fitting
+          </h4>
+
+          <p>
+            Configuration options passed
+            to the model constructor.
+          </p>
+        </article>
+
+        <article>
+          <span>
+            FIT PARAMETERS
+          </span>
+
+          <h4>
+            Passed during training
+          </h4>
+
+          <p>
+            Extra information supplied
+            when calling the fitting
+            method.
+          </p>
+        </article>
+
+        <article>
+          <span>
+            LEARNED ATTRIBUTES
+          </span>
+
+          <h4>
+            Created by training
+          </h4>
+
+          <p>
+            Values learned or calculated
+            after the estimator has been
+            fitted.
+          </p>
+        </article>
+
+      </div>
+
+
+      {/* TUNING SUMMARY */}
+
+      {tuningSummary && (
+        <section className="model-param-tuning-summary">
+
+          <h4>
+            What should I actually tune?
+          </h4>
+
+          <div className="model-param-tuning-columns">
+
+            {tuningSummary.tuneFirst && (
+              <div>
+                <span>
+                  TUNE / CONSIDER
+                </span>
+
+                <TextList
+                  items={
+                    tuningSummary.tuneFirst
+                  }
+                />
+              </div>
+            )}
+
+            {tuningSummary
+              .usuallyLeaveDefault && (
+              <div>
+                <span>
+                  USUALLY LEAVE DEFAULT
+                </span>
+
+                <TextList
+                  items={
+                    tuningSummary
+                      .usuallyLeaveDefault
+                  }
+                />
+              </div>
+            )}
+
+            {tuningSummary
+              .notHyperparameters && (
+              <div>
+                <span>
+                  NOT HYPERPARAMETERS
+                </span>
+
+                <TextList
+                  items={
+                    tuningSummary
+                      .notHyperparameters
+                  }
+                />
+              </div>
+            )}
+
+          </div>
+
+        </section>
+      )}
+
+
+      {/* NAVIGATION */}
+
+      <div className="model-param-section-tabs">
+
+        <button
+          type="button"
+          className={
+            activeSection === "model"
+              ? "model-param-section-tab active"
+              : "model-param-section-tab"
+          }
+          onClick={() =>
+            setActiveSection("model")
+          }
+        >
+          Model Parameters
+          <span>
+            {parameters.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={
+            activeSection === "fit"
+              ? "model-param-section-tab active"
+              : "model-param-section-tab"
+          }
+          onClick={() =>
+            setActiveSection("fit")
+          }
+        >
+          Fit Parameters
+          <span>
+            {fitParameters.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={
+            activeSection ===
+            "attributes"
+              ? "model-param-section-tab active"
+              : "model-param-section-tab"
+          }
+          onClick={() =>
+            setActiveSection(
+              "attributes"
+            )
+          }
+        >
+          Learned Attributes
+          <span>
+            {learnedAttributes.length}
+          </span>
+        </button>
+
+      </div>
+
+
+      {/* MODEL PARAMETERS */}
+
+      {activeSection === "model" && (
+        <>
+
+          <div className="model-param-search">
+            <span>
+              Search
+            </span>
+
+            <input
+              type="text"
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                )
+              }
+              placeholder={`Search ${modelName} parameters...`}
+            />
+          </div>
+
+          <div className="model-param-cards">
+            {filteredParameters.map(
+              (parameter) => (
+                <ModelParameterCard
+                  key={parameter.id}
+                  parameter={parameter}
+                />
+              )
+            )}
+          </div>
+
+          {filteredParameters.length ===
+            0 && (
+            <div className="model-param-empty">
+              No parameter matched your
+              search.
+            </div>
+          )}
+
+        </>
+      )}
+
+
+      {/* FIT PARAMETERS */}
+
+      {activeSection === "fit" && (
+        <div className="model-param-simple-list">
+
+          {fitParameters.length === 0 && (
+            <div className="model-param-empty">
+              No separate fit parameters
+              are documented for this
+              model yet.
+            </div>
+          )}
+
+          {fitParameters.map(
+            (parameter) => (
+              <article
+                key={parameter.id}
+                className="model-param-simple-card"
+              >
+                <div className="model-param-simple-title">
+                  <code>
+                    {parameter.name}
+                  </code>
+
+                  <h4>
+                    {
+                      parameter.displayName
+                    }
+                  </h4>
+                </div>
+
+                <div className="model-param-quick-grid">
+
+                  <div>
+                    <span>
+                      TYPE
+                    </span>
+
+                    <strong>
+                      {parameter.type}
+                    </strong>
+                  </div>
+
+                  {parameter.defaultValue && (
+                    <div>
+                      <span>
+                        DEFAULT
+                      </span>
+
+                      <strong>
+                        {
+                          parameter.defaultValue
+                        }
+                      </strong>
+                    </div>
+                  )}
+
+                </div>
+
+                <p>
+                  {parameter.description}
+                </p>
+
+                <div className="model-param-callout">
+                  <strong>
+                    Intuition
+                  </strong>
+
+                  <p>
+                    {parameter.intuition}
+                  </p>
+                </div>
+
+                {parameter.whenToUse && (
+                  <>
+                    <h5>
+                      When to use
+                    </h5>
+
+                    <TextList
+                      items={
+                        parameter.whenToUse
+                      }
+                    />
+                  </>
+                )}
+
+                {parameter.importantPoints && (
+                  <>
+                    <h5>
+                      Important points
+                    </h5>
+
+                    <TextList
+                      items={
+                        parameter
+                          .importantPoints
+                      }
+                    />
+                  </>
+                )}
+
+                {parameter.commonMistakes && (
+                  <>
+                    <h5>
+                      Common mistakes
+                    </h5>
+
+                    <TextList
+                      items={
+                        parameter
+                          .commonMistakes
+                      }
+                    />
+                  </>
+                )}
+
+              </article>
+            )
+          )}
+
+        </div>
+      )}
+
+
+      {/* LEARNED ATTRIBUTES */}
+
+      {activeSection ===
+        "attributes" && (
+        <div className="model-param-simple-list">
+
+          {learnedAttributes.length ===
+            0 && (
+            <div className="model-param-empty">
+              No learned attributes are
+              documented for this model
+              yet.
+            </div>
+          )}
+
+          {learnedAttributes.map(
+            (attribute) => (
+              <article
+                key={attribute.id}
+                className="model-param-simple-card"
+              >
+                <div className="model-param-simple-title">
+                  <code>
+                    {attribute.name}
+                  </code>
+
+                  <h4>
+                    {
+                      attribute.displayName
+                    }
+                  </h4>
+                </div>
+
+                {attribute.type && (
+                  <div className="model-param-inline-type">
+                    {
+                      attribute.type
+                    }
+                  </div>
+                )}
+
+                <p>
+                  {attribute.description}
+                </p>
+
+                {attribute.interpretation && (
+                  <>
+                    <h5>
+                      How to interpret it
+                    </h5>
+
+                    <TextList
+                      items={
+                        attribute
+                          .interpretation
+                      }
+                    />
+                  </>
+                )}
+
+                {attribute.importantPoints && (
+                  <>
+                    <h5>
+                      Important points
+                    </h5>
+
+                    <TextList
+                      items={
+                        attribute
+                          .importantPoints
+                      }
+                    />
+                  </>
+                )}
+
+              </article>
+            )
+          )}
+
+        </div>
+      )}
+
+    </section>
+  );
+}

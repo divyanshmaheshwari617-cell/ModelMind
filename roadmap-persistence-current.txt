@@ -1,0 +1,412 @@
+﻿import type {
+  PersonalizedRoadmapData,
+  RoadmapProfile,
+} from "../../types/roadmap";
+
+
+// =========================================================
+// STORAGE KEYS
+// =========================================================
+
+const ROADMAP_STORAGE_KEY =
+  "modelmind-personalized-roadmap";
+
+const PROFILE_STORAGE_KEY =
+  "modelmind-roadmap-profile";
+
+
+// =========================================================
+// ENVIRONMENT CHECK
+// =========================================================
+
+function canUseStorage(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.localStorage !== "undefined"
+  );
+}
+
+
+// =========================================================
+// SAFE JSON PARSING
+// =========================================================
+
+function safeParse<T>(
+  value: string | null
+): T | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+
+// =========================================================
+// ROADMAP VALIDATION
+// =========================================================
+
+function isValidRoadmap(
+  value: unknown
+): value is PersonalizedRoadmapData {
+  if (
+    typeof value !== "object" ||
+    value === null
+  ) {
+    return false;
+  }
+
+  const roadmap =
+    value as Partial<PersonalizedRoadmapData>;
+
+  return (
+    typeof roadmap.id === "string" &&
+    typeof roadmap.name === "string" &&
+    typeof roadmap.profile === "object" &&
+    Array.isArray(roadmap.weeks) &&
+    Array.isArray(roadmap.projects) &&
+    Array.isArray(roadmap.assessments) &&
+    typeof roadmap.overallProgress ===
+      "number" &&
+    typeof roadmap.currentDay ===
+      "number" &&
+    typeof roadmap.totalDays ===
+      "number"
+  );
+}
+
+
+// =========================================================
+// PROFILE VALIDATION
+// =========================================================
+
+function isValidProfile(
+  value: unknown
+): value is RoadmapProfile {
+  if (
+    typeof value !== "object" ||
+    value === null
+  ) {
+    return false;
+  }
+
+  const profile =
+    value as Partial<RoadmapProfile>;
+
+  return (
+    typeof profile.goal === "string" &&
+    typeof profile.level === "string" &&
+    typeof profile.minutesPerDay ===
+      "number" &&
+    typeof profile.durationWeeks ===
+      "number"
+  );
+}
+
+
+// =========================================================
+// SAVE ROADMAP
+// =========================================================
+
+export function saveRoadmap(
+  roadmap: PersonalizedRoadmapData
+): boolean {
+  if (!canUseStorage()) {
+    return false;
+  }
+
+  try {
+    const updatedRoadmap = {
+      ...roadmap,
+
+      updatedAt:
+        new Date().toISOString(),
+    };
+
+    window.localStorage.setItem(
+      ROADMAP_STORAGE_KEY,
+      JSON.stringify(
+        updatedRoadmap
+      )
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+// =========================================================
+// LOAD ROADMAP
+// =========================================================
+
+export function loadRoadmap():
+  PersonalizedRoadmapData | null {
+  if (!canUseStorage()) {
+    return null;
+  }
+
+  try {
+    const raw =
+      window.localStorage.getItem(
+        ROADMAP_STORAGE_KEY
+      );
+
+    const parsed =
+      safeParse<unknown>(raw);
+
+    if (
+      !isValidRoadmap(parsed)
+    ) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+
+// =========================================================
+// DELETE ROADMAP
+// =========================================================
+
+export function deleteRoadmap(): boolean {
+  if (!canUseStorage()) {
+    return false;
+  }
+
+  try {
+    window.localStorage.removeItem(
+      ROADMAP_STORAGE_KEY
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+// =========================================================
+// ROADMAP EXISTS
+// =========================================================
+
+export function hasSavedRoadmap(): boolean {
+  if (!canUseStorage()) {
+    return false;
+  }
+
+  try {
+    return (
+      window.localStorage.getItem(
+        ROADMAP_STORAGE_KEY
+      ) !== null
+    );
+  } catch {
+    return false;
+  }
+}
+
+
+// =========================================================
+// SAVE PROFILE
+// =========================================================
+
+export function saveRoadmapProfile(
+  profile: RoadmapProfile
+): boolean {
+  if (!canUseStorage()) {
+    return false;
+  }
+
+  try {
+    window.localStorage.setItem(
+      PROFILE_STORAGE_KEY,
+      JSON.stringify(profile)
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+// =========================================================
+// LOAD PROFILE
+// =========================================================
+
+export function loadRoadmapProfile():
+  RoadmapProfile | null {
+  if (!canUseStorage()) {
+    return null;
+  }
+
+  try {
+    const raw =
+      window.localStorage.getItem(
+        PROFILE_STORAGE_KEY
+      );
+
+    const parsed =
+      safeParse<unknown>(raw);
+
+    if (
+      !isValidProfile(parsed)
+    ) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+
+// =========================================================
+// DELETE PROFILE
+// =========================================================
+
+export function deleteRoadmapProfile():
+  boolean {
+  if (!canUseStorage()) {
+    return false;
+  }
+
+  try {
+    window.localStorage.removeItem(
+      PROFILE_STORAGE_KEY
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+// =========================================================
+// CLEAR ALL ROADMAP DATA
+// =========================================================
+
+export function clearRoadmapStorage():
+  boolean {
+  if (!canUseStorage()) {
+    return false;
+  }
+
+  try {
+    window.localStorage.removeItem(
+      ROADMAP_STORAGE_KEY
+    );
+
+    window.localStorage.removeItem(
+      PROFILE_STORAGE_KEY
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+// =========================================================
+// EXPORT ROADMAP
+// Useful later for backup/download.
+// =========================================================
+
+export function exportRoadmap(
+  roadmap: PersonalizedRoadmapData
+): string {
+  return JSON.stringify(
+    roadmap,
+    null,
+    2
+  );
+}
+
+
+// =========================================================
+// IMPORT ROADMAP
+// =========================================================
+
+export function importRoadmap(
+  json: string
+): PersonalizedRoadmapData | null {
+  const parsed =
+    safeParse<unknown>(json);
+
+  if (!isValidRoadmap(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+
+// =========================================================
+// SAVE IMPORTED ROADMAP
+// =========================================================
+
+export function importAndSaveRoadmap(
+  json: string
+): PersonalizedRoadmapData | null {
+  const roadmap =
+    importRoadmap(json);
+
+  if (!roadmap) {
+    return null;
+  }
+
+  const saved =
+    saveRoadmap(roadmap);
+
+  return saved
+    ? roadmap
+    : null;
+}
+
+
+// =========================================================
+// STORAGE INFORMATION
+// =========================================================
+
+export function getRoadmapStorageInfo(): {
+  hasRoadmap: boolean;
+  hasProfile: boolean;
+} {
+  if (!canUseStorage()) {
+    return {
+      hasRoadmap: false,
+      hasProfile: false,
+    };
+  }
+
+  try {
+    return {
+      hasRoadmap:
+        window.localStorage.getItem(
+          ROADMAP_STORAGE_KEY
+        ) !== null,
+
+      hasProfile:
+        window.localStorage.getItem(
+          PROFILE_STORAGE_KEY
+        ) !== null,
+    };
+  } catch {
+    return {
+      hasRoadmap: false,
+      hasProfile: false,
+    };
+  }
+}
