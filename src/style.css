@@ -1,0 +1,148 @@
+:root {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  color: #f8fafc;
+  background: #020617;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #020617;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at top,
+      #172554 0%,
+      #020617 38%,
+      #020617 100%
+    );
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+button {
+  transition:
+    transform 120ms ease,
+    opacity 120ms ease,
+    border-color 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.modelmind-app {
+  width: min(1500px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 80px;
+}
+
+.modelmind-header {
+  padding: 24px;
+  margin-bottom: 18px;
+
+  border: 1px solid #334155;
+  border-radius: 20px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(30, 41, 59, 0.96),
+      rgba(30, 27, 75, 0.96)
+    );
+}
+
+.modelmind-brand {
+  color: #a78bfa;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+.modelmind-header h1 {
+  margin: 7px 0 8px;
+  font-size: clamp(28px, 4vw, 46px);
+}
+
+.modelmind-header p {
+  margin: 0;
+  max-width: 780px;
+
+  color: #cbd5e1;
+  line-height: 1.7;
+}
+
+.modelmind-section {
+  display: grid;
+  gap: 16px;
+}
+
+.modelmind-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  margin: 36px 0 20px;
+
+  color: #a78bfa;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+.modelmind-divider::before,
+.modelmind-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #334155;
+}
+
+table {
+  color: inherit;
+}
+
+select {
+  color-scheme: dark;
+}
+
+input[type="range"] {
+  accent-color: #8b5cf6;
+}
+
+@media (max-width: 700px) {
+  .modelmind-app {
+    width: min(100% - 18px, 1500px);
+    padding-top: 10px;
+  }
+
+  .modelmind-header {
+    padding: 17px;
+  }
+}
