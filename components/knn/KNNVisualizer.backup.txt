@@ -1,0 +1,1751 @@
+import {
+
+  useMemo,
+
+  useState,
+
+} from "react";
+
+
+
+import type {
+
+  DistanceMetric,
+
+  KNNRow,
+
+  KNNTask,
+
+  LearningLevel,
+
+  WeightingMethod,
+
+} from "./types/knn";
+
+
+
+import {
+
+  createScalers,
+
+  findBestKClassification,
+
+  findBestKRegression,
+
+  findNearestNeighbors,
+
+  splitClassificationDataset,
+
+  splitRegressionDataset,
+
+  standardizeFeatures,
+
+  standardizeRows,
+
+} from "./utils/knnMath";
+
+
+
+
+
+import KNNDatasetAnalyzer from "./dataset/KNNDatasetAnalyzer";
+
+
+
+import KNNControls from "./controls/KNNControls";
+
+
+
+import QueryPointController from "./prediction/QueryPointController";
+
+
+
+import DistanceExplanation from "./distance/DistanceExplanation";
+
+
+
+import DistanceComparison from "./distance/DistanceComparison";
+
+
+
+import NeighborSelectionVisualizer from "./neighbors/NeighborSelectionVisualizer";
+
+
+
+import NeighborTable from "./neighbors/NeighborTable";
+
+
+
+import KNNClassificationLab from "./classification/KNNClassificationLab";
+
+
+
+import KNNRegressionLab from "./regression/KNNRegressionLab";
+
+
+
+import OptimalKVisualizer from "./optimization/OptimalKVisualizer";
+
+
+
+import KNNExplanation from "./explanations/KNNExplanation";
+
+
+
+import KNNLearningDashboard from "./KNNLearningDashboard";
+
+
+
+export default function KNNVisualizer() {
+
+  const [
+
+    sourceRows,
+
+    setSourceRows,
+
+  ] = useState<KNNRow[]>([]);
+
+
+
+  const [
+
+    featureNames,
+
+    setFeatureNames,
+
+  ] = useState<string[]>([]);
+
+
+
+  const [
+
+    targetName,
+
+    setTargetName,
+
+  ] = useState("");
+
+
+
+  const [task, setTask] =
+
+    useState<KNNTask>(
+
+      "classification",
+
+    );
+
+
+
+  const [
+
+    scalingEnabled,
+
+    setScalingEnabled,
+
+  ] = useState(true);
+
+
+
+  const [k, setK] =
+
+    useState(3);
+
+
+
+  const [
+
+    distanceMetric,
+
+    setDistanceMetric,
+
+  ] =
+
+    useState<DistanceMetric>(
+
+      "euclidean",
+
+    );
+
+
+
+  const [
+
+    weighting,
+
+    setWeighting,
+
+  ] =
+
+    useState<WeightingMethod>(
+
+      "uniform",
+
+    );
+
+
+
+  const [
+
+    minkowskiP,
+
+    setMinkowskiP,
+
+  ] = useState(2);
+
+
+
+  const [
+
+    learningLevel,
+
+    setLearningLevel,
+
+  ] =
+
+    useState<LearningLevel>(
+
+      "basic",
+
+    );
+
+
+
+  const [
+
+    rawQuery,
+
+    setRawQuery,
+
+  ] = useState<number[]>([]);
+
+
+
+  const [
+
+    xFeatureIndex,
+
+    setXFeatureIndex,
+
+  ] = useState(0);
+
+
+
+  const [
+
+    yFeatureIndex,
+
+    setYFeatureIndex,
+
+  ] = useState(1);
+
+
+
+  const scalers =
+
+    useMemo(
+
+      () =>
+
+        sourceRows.length > 0
+
+          ? createScalers(
+
+              sourceRows,
+
+            )
+
+          : [],
+
+      [sourceRows],
+
+    );
+
+
+
+  const modelRows =
+
+    useMemo(
+
+      () =>
+
+        scalingEnabled &&
+
+        scalers.length > 0
+
+          ? standardizeRows(
+
+              sourceRows,
+
+              scalers,
+
+            )
+
+          : sourceRows,
+
+      [
+
+        sourceRows,
+
+        scalingEnabled,
+
+        scalers,
+
+      ],
+
+    );
+
+
+
+  const modelQuery =
+
+    useMemo(
+
+      () =>
+
+        scalingEnabled &&
+
+        scalers.length > 0 &&
+
+        rawQuery.length > 0
+
+          ? standardizeFeatures(
+
+              rawQuery,
+
+              scalers,
+
+            )
+
+          : rawQuery,
+
+      [
+
+        rawQuery,
+
+        scalingEnabled,
+
+        scalers,
+
+      ],
+
+    );
+
+
+
+  const rawFeatureRanges =
+
+    useMemo(() => {
+
+      if (
+
+        sourceRows.length === 0
+
+      ) {
+
+        return [];
+
+      }
+
+
+
+      return sourceRows[
+
+        0
+
+      ].features.map(
+
+        (
+
+          _,
+
+          featureIndex,
+
+        ) => {
+
+          const values =
+
+            sourceRows.map(
+
+              (row) =>
+
+                row.features[
+
+                  featureIndex
+
+                ],
+
+            );
+
+
+
+          return {
+
+            min: Math.min(
+
+              ...values,
+
+            ),
+
+
+
+            max: Math.max(
+
+              ...values,
+
+            ),
+
+          };
+
+        },
+
+      );
+
+    }, [sourceRows]);
+
+
+
+  const neighbors =
+
+    useMemo(() => {
+
+      if (
+
+        modelRows.length ===
+
+          0 ||
+
+        modelQuery.length ===
+
+          0
+
+      ) {
+
+        return [];
+
+      }
+
+
+
+      return findNearestNeighbors(
+
+        modelRows,
+
+        modelQuery,
+
+        Math.min(
+
+          k,
+
+          modelRows.length,
+
+        ),
+
+        distanceMetric,
+
+        weighting,
+
+        minkowskiP,
+
+      );
+
+    }, [
+
+      modelRows,
+
+      modelQuery,
+
+      k,
+
+      distanceMetric,
+
+      weighting,
+
+      minkowskiP,
+
+    ]);
+
+
+
+  /*
+
+    Optimization requires separate
+
+    training and validation datasets.
+
+
+
+    We create the correct split here
+
+    before calling findBestK...
+
+  */
+
+  const optimizationPoints =
+
+    useMemo(() => {
+
+      if (
+
+        modelRows.length < 4
+
+      ) {
+
+        return [];
+
+      }
+
+
+
+      if (
+
+        task ===
+
+        "classification"
+
+      ) {
+
+        const split =
+
+          splitClassificationDataset(
+
+            modelRows,
+
+            0.25,
+
+          );
+
+
+
+        if (
+
+          split.train.length ===
+
+            0 ||
+
+          split.test.length ===
+
+            0
+
+        ) {
+
+          return [];
+
+        }
+
+
+
+        const maxK =
+
+          Math.max(
+
+            1,
+
+            Math.min(
+
+              15,
+
+              split.train.length,
+
+            ),
+
+          );
+
+
+
+        return findBestKClassification(
+
+          split.train,
+
+          split.test,
+
+          maxK,
+
+          distanceMetric,
+
+          weighting,
+
+          minkowskiP,
+
+        );
+
+      }
+
+
+
+      const split =
+
+        splitRegressionDataset(
+
+          modelRows,
+
+          0.25,
+
+        );
+
+
+
+      if (
+
+        split.train.length ===
+
+          0 ||
+
+        split.test.length ===
+
+          0
+
+      ) {
+
+        return [];
+
+      }
+
+
+
+      const maxK =
+
+        Math.max(
+
+          1,
+
+          Math.min(
+
+            15,
+
+            split.train.length,
+
+          ),
+
+        );
+
+
+
+      return findBestKRegression(
+
+        split.train,
+
+        split.test,
+
+        maxK,
+
+        distanceMetric,
+
+        weighting,
+
+        minkowskiP,
+
+      );
+
+    }, [
+
+      modelRows,
+
+      task,
+
+      distanceMetric,
+
+      weighting,
+
+      minkowskiP,
+
+    ]);
+
+
+
+  const bestK =
+
+    useMemo(() => {
+
+      if (
+
+        optimizationPoints.length ===
+
+        0
+
+      ) {
+
+        return undefined;
+
+      }
+
+
+
+      if (
+
+        task ===
+
+        "classification"
+
+      ) {
+
+        return optimizationPoints.reduce(
+
+          (
+
+            best,
+
+            point,
+
+          ) =>
+
+            point.score >
+
+            best.score
+
+              ? point
+
+              : best,
+
+        ).k;
+
+      }
+
+
+
+      return optimizationPoints.reduce(
+
+        (
+
+          best,
+
+          point,
+
+        ) =>
+
+          point.score <
+
+          best.score
+
+            ? point
+
+            : best,
+
+      ).k;
+
+    }, [
+
+      optimizationPoints,
+
+      task,
+
+    ]);
+
+
+
+  function useDataset(
+
+    rows: KNNRow[],
+
+    names: string[],
+
+    target: string,
+
+    nextTask: KNNTask,
+
+    scale: boolean,
+
+  ) {
+
+    setSourceRows(rows);
+
+
+
+    setFeatureNames(names);
+
+
+
+    setTargetName(target);
+
+
+
+    setTask(nextTask);
+
+
+
+    setScalingEnabled(
+
+      scale,
+
+    );
+
+
+
+    const means =
+
+      rows.length === 0
+
+        ? []
+
+        : rows[
+
+            0
+
+          ].features.map(
+
+            (
+
+              _,
+
+              featureIndex,
+
+            ) =>
+
+              rows.reduce(
+
+                (
+
+                  total,
+
+                  row,
+
+                ) =>
+
+                  total +
+
+                  row.features[
+
+                    featureIndex
+
+                  ],
+
+                0,
+
+              ) /
+
+              rows.length,
+
+          );
+
+
+
+    setRawQuery(means);
+
+
+
+    setK(
+
+      Math.min(
+
+        3,
+
+        Math.max(
+
+          1,
+
+          rows.length,
+
+        ),
+
+      ),
+
+    );
+
+
+
+    setXFeatureIndex(0);
+
+
+
+    setYFeatureIndex(
+
+      names.length > 1
+
+        ? 1
+
+        : 0,
+
+    );
+
+  }
+
+
+
+  if (
+
+    sourceRows.length ===
+
+      0 ||
+
+    rawQuery.length === 0
+
+  ) {
+
+    return (
+
+      <main className="knn-app-shell">
+
+        <header className="knn-hero">
+
+          <p className="knn-eyebrow">
+
+            MODELMIND VISUAL ML LAB
+
+          </p>
+
+
+
+          <h1>
+
+            K-Nearest Neighbors
+
+          </h1>
+
+
+
+          <p>
+
+            See exactly how KNN
+
+            measures distance,
+
+            chooses neighbors and
+
+            creates classification
+
+            or regression
+
+            predictions.
+
+          </p>
+
+        </header>
+
+
+
+        <KNNDatasetAnalyzer onUseDataset={useDataset} />
+
+      </main>
+
+    );
+
+  }
+
+
+
+  return (
+
+    <main className="knn-app-shell">
+
+      <header className="knn-hero">
+
+        <p className="knn-eyebrow">
+
+          MODELMIND VISUAL ML LAB
+
+        </p>
+
+
+
+        <h1>
+
+          K-Nearest Neighbors
+
+        </h1>
+
+
+
+        <p>
+
+          Dataset → Distance →
+
+          Neighbors → Prediction →
+
+          Evaluation
+
+        </p>
+
+
+
+        <button
+
+          type="button"
+
+          onClick={() => {
+
+            setSourceRows([]);
+
+            setRawQuery([]);
+
+          }}
+
+        >
+
+          Change Dataset
+
+        </button>
+
+      </header>
+
+
+
+      <section className="knn-card">
+
+        <div className="knn-stat-grid">
+
+          <div className="knn-stat">
+
+            <span>
+
+              Task
+
+            </span>
+
+
+
+            <strong>
+
+              {task}
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Target
+
+            </span>
+
+
+
+            <strong>
+
+              {targetName}
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Rows
+
+            </span>
+
+
+
+            <strong>
+
+              {sourceRows.length}
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Features
+
+            </span>
+
+
+
+            <strong>
+
+              {featureNames.length}
+
+            </strong>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+      <KNNExplanation
+
+        task={task}
+
+        level={
+
+          learningLevel
+
+        }
+
+        onLevelChange={
+
+          setLearningLevel
+
+        }
+
+      />
+
+
+
+      <KNNControls
+
+        k={k}
+
+        maxK={Math.max(
+
+          1,
+
+          Math.min(
+
+            25,
+
+            modelRows.length,
+
+          ),
+
+        )}
+
+        distanceMetric={
+
+          distanceMetric
+
+        }
+
+        weighting={
+
+          weighting
+
+        }
+
+        minkowskiP={
+
+          minkowskiP
+
+        }
+
+        onKChange={setK}
+
+        onDistanceMetricChange={
+
+          setDistanceMetric
+
+        }
+
+        onWeightingChange={
+
+          setWeighting
+
+        }
+
+        onMinkowskiPChange={
+
+          setMinkowskiP
+
+        }
+
+      />
+
+
+
+      <QueryPointController
+
+        queryFeatures={
+
+          rawQuery
+
+        }
+
+        featureNames={
+
+          featureNames
+
+        }
+
+        featureRanges={
+
+          rawFeatureRanges
+
+        }
+
+        onQueryChange={
+
+          setRawQuery
+
+        }
+
+        onReset={() => {
+
+          const means =
+
+            sourceRows[
+
+              0
+
+            ].features.map(
+
+              (
+
+                _,
+
+                featureIndex,
+
+              ) =>
+
+                sourceRows.reduce(
+
+                  (
+
+                    total,
+
+                    row,
+
+                  ) =>
+
+                    total +
+
+                    row.features[
+
+                      featureIndex
+
+                    ],
+
+                  0,
+
+                ) /
+
+                sourceRows.length,
+
+            );
+
+
+
+          setRawQuery(
+
+            means,
+
+          );
+
+        }}
+
+      />
+
+
+
+      {featureNames.length >
+
+        1 && (
+
+        <section className="knn-card">
+
+          <p className="knn-eyebrow">
+
+            VISUAL AXES
+
+          </p>
+
+
+
+          <h2>
+
+            Choose Display Features
+
+          </h2>
+
+
+
+          <div className="knn-two-column">
+
+            <div className="knn-control-block">
+
+              <label>
+
+                X Feature
+
+              </label>
+
+
+
+              <select
+
+                value={
+
+                  xFeatureIndex
+
+                }
+
+                onChange={(
+
+                  event,
+
+                ) =>
+
+                  setXFeatureIndex(
+
+                    Number(
+
+                      event.target
+
+                        .value,
+
+                    ),
+
+                  )
+
+                }
+
+              >
+
+                {featureNames.map(
+
+                  (
+
+                    name,
+
+                    index,
+
+                  ) => (
+
+                    <option
+
+                      value={
+
+                        index
+
+                      }
+
+                      key={
+
+                        name
+
+                      }
+
+                    >
+
+                      {name}
+
+                    </option>
+
+                  ),
+
+                )}
+
+              </select>
+
+            </div>
+
+
+
+            <div className="knn-control-block">
+
+              <label>
+
+                Y Feature
+
+              </label>
+
+
+
+              <select
+
+                value={
+
+                  yFeatureIndex
+
+                }
+
+                onChange={(
+
+                  event,
+
+                ) =>
+
+                  setYFeatureIndex(
+
+                    Number(
+
+                      event.target
+
+                        .value,
+
+                    ),
+
+                  )
+
+                }
+
+              >
+
+                {featureNames.map(
+
+                  (
+
+                    name,
+
+                    index,
+
+                  ) => (
+
+                    <option
+
+                      value={
+
+                        index
+
+                      }
+
+                      key={
+
+                        name
+
+                      }
+
+                    >
+
+                      {name}
+
+                    </option>
+
+                  ),
+
+                )}
+
+              </select>
+
+            </div>
+
+          </div>
+
+        </section>
+
+      )}
+
+
+
+      <DistanceExplanation
+
+        metric={
+
+          distanceMetric
+
+        }
+
+        minkowskiP={
+
+          minkowskiP
+
+        }
+
+        queryFeatures={
+
+          modelQuery
+
+        }
+
+        neighborFeatures={
+
+          neighbors[0]?.row
+
+            .features
+
+        }
+
+        featureNames={
+
+          featureNames
+
+        }
+
+      />
+
+
+
+      {neighbors[0] && (
+
+        <DistanceComparison
+
+          queryFeatures={
+
+            modelQuery
+
+          }
+
+          neighborFeatures={
+
+            neighbors[0].row
+
+              .features
+
+          }
+
+          minkowskiP={
+
+            minkowskiP
+
+          }
+
+        />
+
+      )}
+
+
+
+      {featureNames.length >
+
+        1 && (
+
+        <NeighborSelectionVisualizer
+
+          rows={modelRows}
+
+          queryFeatures={
+
+            modelQuery
+
+          }
+
+          featureNames={
+
+            featureNames
+
+          }
+
+          xFeatureIndex={
+
+            xFeatureIndex
+
+          }
+
+          yFeatureIndex={
+
+            yFeatureIndex
+
+          }
+
+          k={Math.min(
+
+            k,
+
+            modelRows.length,
+
+          )}
+
+          distanceMetric={
+
+            distanceMetric
+
+          }
+
+          weighting={
+
+            weighting
+
+          }
+
+          minkowskiP={
+
+            minkowskiP
+
+          }
+
+        />
+
+      )}
+
+
+
+      <NeighborTable
+
+        neighbors={
+
+          neighbors
+
+        }
+
+      />
+
+
+
+      {task ===
+
+      "classification" ? (
+
+        <KNNClassificationLab
+
+          rows={modelRows}
+
+          queryFeatures={
+
+            modelQuery
+
+          }
+
+          featureNames={
+
+            featureNames
+
+          }
+
+          k={Math.min(
+
+            k,
+
+            modelRows.length,
+
+          )}
+
+          distanceMetric={
+
+            distanceMetric
+
+          }
+
+          weighting={
+
+            weighting
+
+          }
+
+          minkowskiP={
+
+            minkowskiP
+
+          }
+
+          xFeatureIndex={
+
+            xFeatureIndex
+
+          }
+
+          yFeatureIndex={
+
+            yFeatureIndex
+
+          }
+
+        />
+
+      ) : (
+
+        <KNNRegressionLab
+
+          rows={modelRows}
+
+          queryFeatures={
+
+            modelQuery
+
+          }
+
+          featureNames={
+
+            featureNames
+
+          }
+
+          k={Math.min(
+
+            k,
+
+            modelRows.length,
+
+          )}
+
+          distanceMetric={
+
+            distanceMetric
+
+          }
+
+          weighting={
+
+            weighting
+
+          }
+
+          minkowskiP={
+
+            minkowskiP
+
+          }
+
+          xFeatureIndex={
+
+            xFeatureIndex
+
+          }
+
+        />
+
+      )}
+
+
+
+      <OptimalKVisualizer
+
+        points={
+
+          optimizationPoints
+
+        }
+
+        task={task}
+
+        currentK={k}
+
+        onKSelect={
+
+          setK
+
+        }
+
+      />
+
+
+
+      <KNNLearningDashboard
+
+        task={task}
+
+        rowCount={
+
+          sourceRows.length
+
+        }
+
+        featureCount={
+
+          featureNames.length
+
+        }
+
+        k={k}
+
+        distanceMetric={
+
+          distanceMetric
+
+        }
+
+        weighting={
+
+          weighting
+
+        }
+
+        scalingEnabled={
+
+          scalingEnabled
+
+        }
+
+        bestK={bestK}
+
+      />
+
+    </main>
+
+  );
+
+}

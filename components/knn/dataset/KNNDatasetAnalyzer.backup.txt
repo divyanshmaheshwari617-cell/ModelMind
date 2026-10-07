@@ -1,0 +1,1356 @@
+import {
+
+  useMemo,
+
+  useState,
+
+} from "react";
+
+
+
+import Papa from "papaparse";
+
+
+
+import type {
+
+  KNNRow,
+
+  KNNTask,
+
+} from "../types/knn";
+
+
+
+import MissingValueAnalyzer from "../preprocessing/MissingValueAnalyzer";
+
+
+
+import ScalingAnalyzer from "../preprocessing/ScalingAnalyzer";
+
+
+
+import {
+
+  detectSuggestedTask,
+
+  getClassCounts,
+
+  getColumns,
+
+  getNumericColumns,
+
+  prepareDataset,
+
+  summarizeColumns,
+
+} from "../preprocessing/preprocessingMath";
+
+
+
+import type {
+
+  MissingStrategy,
+
+  RawDatasetRow,
+
+} from "../preprocessing/preprocessingMath";
+
+
+
+interface Props {
+
+  onUseDataset: (
+
+    rows: KNNRow[],
+
+    featureNames: string[],
+
+    targetName: string,
+
+    task: KNNTask,
+
+    scalingEnabled: boolean,
+
+  ) => void;
+
+}
+
+
+
+export default function KNNDatasetAnalyzer({
+
+  onUseDataset,
+
+}: Props) {
+
+  const [rawRows, setRawRows] = useState<RawDatasetRow[]>([]);
+
+
+
+  const columns = useMemo(
+
+    () => getColumns(rawRows),
+
+    [rawRows],
+
+  );
+
+
+
+  const numericColumns =
+
+    useMemo(
+
+      () =>
+
+        getNumericColumns(
+
+          rawRows,
+
+        ),
+
+      [rawRows],
+
+    );
+
+
+
+  const [targetColumn, setTargetColumn] =
+    useState("");
+
+
+
+  const [featureColumns, setFeatureColumns] =
+    useState<string[]>([]);
+
+
+
+  const [task, setTask] =
+    useState<KNNTask>("classification");
+
+
+
+  const [
+
+    missingStrategy,
+
+    setMissingStrategy,
+
+  ] =
+
+    useState<MissingStrategy>(
+
+      "median",
+
+    );
+
+
+
+  const [
+
+    scalingEnabled,
+
+    setScalingEnabled,
+
+  ] = useState(true);
+
+
+
+  const summaries = useMemo(
+
+    () =>
+
+      summarizeColumns(rawRows),
+
+    [rawRows],
+
+  );
+
+
+
+  const prepared = useMemo(
+
+    () =>
+
+      prepareDataset(
+
+        rawRows,
+
+        featureColumns,
+
+        targetColumn,
+
+        task,
+
+        missingStrategy,
+
+      ),
+
+    [
+
+      rawRows,
+
+      featureColumns,
+
+      targetColumn,
+
+      task,
+
+      missingStrategy,
+
+    ],
+
+  );
+
+
+
+  const classCounts =
+
+    useMemo(
+
+      () =>
+
+        task ===
+
+        "classification"
+
+          ? getClassCounts(
+
+              prepared.rows,
+
+            )
+
+          : [],
+
+      [prepared.rows, task],
+
+    );
+
+
+
+  function toggleFeature(
+
+    column: string,
+
+  ) {
+
+    setFeatureColumns(
+
+      (current) => {
+
+        if (
+
+          current.includes(column)
+
+        ) {
+
+          return current.filter(
+
+            (item) =>
+
+              item !== column,
+
+          );
+
+        }
+
+
+
+        return [
+
+          ...current,
+
+          column,
+
+        ];
+
+      },
+
+    );
+
+  }
+
+
+
+  function handleTargetChange(
+
+    column: string,
+
+  ) {
+
+    setTargetColumn(column);
+
+
+
+    setFeatureColumns(
+
+      (current) =>
+
+        current.filter(
+
+          (feature) =>
+
+            feature !== column,
+
+        ),
+
+    );
+
+
+
+    setTask(
+
+      detectSuggestedTask(
+
+        rawRows,
+
+        column,
+
+      ),
+
+    );
+
+  }
+
+
+
+  function handleCSV(
+
+    file: File,
+
+  ) {
+
+    Papa.parse<RawDatasetRow>(
+
+      file,
+
+      {
+
+        header: true,
+
+
+
+        skipEmptyLines: true,
+
+
+
+        dynamicTyping: true,
+
+
+
+        complete: (results) => {
+
+          const parsedRows =
+
+            results.data.filter(
+
+              (row) =>
+
+                Object.keys(
+
+                  row,
+
+                ).length > 0,
+
+            );
+
+
+
+          if (
+
+            parsedRows.length ===
+
+            0
+
+          ) {
+
+            return;
+
+          }
+
+
+
+          setRawRows(
+
+            parsedRows,
+
+          );
+
+
+
+          const newColumns =
+
+            getColumns(
+
+              parsedRows,
+
+            );
+
+
+
+          const newNumeric =
+
+            getNumericColumns(
+
+              parsedRows,
+
+            );
+
+
+
+          const suggestedTarget =
+
+            newColumns[
+
+              newColumns.length -
+
+                1
+
+            ];
+
+
+
+          setTargetColumn(
+
+            suggestedTarget,
+
+          );
+
+
+
+          setFeatureColumns(
+
+            newNumeric
+
+              .filter(
+
+                (column) =>
+
+                  column !==
+
+                  suggestedTarget,
+
+              )
+
+              .slice(0, 4),
+
+          );
+
+
+
+          setTask(
+
+            detectSuggestedTask(
+
+              parsedRows,
+
+              suggestedTarget,
+
+            ),
+
+          );
+
+        },
+
+      },
+
+    );
+
+  }
+
+
+
+  if (rawRows.length === 0) {
+    return (
+      <section className="knn-dataset-shell">
+        <div className="knn-card">
+          <div className="knn-section-heading">
+            <div>
+              <p className="knn-eyebrow">DATASET</p>
+              <h2>KNN Dataset Analyzer</h2>
+              <p className="knn-muted">
+                No dataset loaded yet. Upload a CSV dataset to begin.
+              </p>
+            </div>
+
+            <label className="knn-upload-button">
+              Upload CSV
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    handleCSV(file);
+                  }
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+
+          <div className="knn-info-box">
+            Upload a dataset to continue with task selection, target and feature selection, missing-value analysis, scaling, and KNN visualization.
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+
+
+  const canUseDataset =
+
+    prepared.rows.length > 0 &&
+
+    featureColumns.length > 0 &&
+
+    targetColumn.length > 0 &&
+
+    !featureColumns.includes(
+
+      targetColumn,
+
+    ) &&
+
+    prepared.warnings.length ===
+
+      0;
+
+
+
+  return (
+
+    <section className="knn-dataset-shell">
+
+      <div className="knn-card">
+
+        <div className="knn-section-heading">
+
+          <div>
+
+            <p className="knn-eyebrow">
+
+              DATASET
+
+            </p>
+
+
+
+            <h2>
+
+              KNN Dataset Analyzer
+
+            </h2>
+
+
+
+            <p className="knn-muted">
+
+              Upload a CSV dataset to begin.
+
+            </p>
+
+          </div>
+
+
+
+          <label className="knn-upload-button">
+
+            Upload CSV
+
+
+
+            <input
+
+              type="file"
+
+              accept=".csv,text/csv"
+
+              hidden
+
+              onChange={(
+
+                event,
+
+              ) => {
+
+                const file =
+
+                  event.target
+
+                    .files?.[0];
+
+
+
+                if (file) {
+
+                  handleCSV(file);
+
+                }
+
+
+
+                event.target.value =
+
+                  "";
+
+              }}
+
+            />
+
+          </label>
+
+        </div>
+
+
+
+        <div className="knn-stat-grid">
+
+          <div className="knn-stat">
+
+            <span>
+
+              Raw rows
+
+            </span>
+
+
+
+            <strong>
+
+              {rawRows.length}
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Columns
+
+            </span>
+
+
+
+            <strong>
+
+              {columns.length}
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Numeric columns
+
+            </span>
+
+
+
+            <strong>
+
+              {
+
+                numericColumns.length
+
+              }
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Usable rows
+
+            </span>
+
+
+
+            <strong>
+
+              {
+
+                prepared.rows.length
+
+              }
+
+            </strong>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div className="knn-card">
+
+        <p className="knn-eyebrow">
+
+          TASK
+
+        </p>
+
+
+
+        <h2>
+
+          Classification or
+
+          Regression?
+
+        </h2>
+
+
+
+        <div className="knn-choice-grid">
+
+          <button
+
+            type="button"
+
+            className={
+
+              task ===
+
+              "classification"
+
+                ? "knn-choice active"
+
+                : "knn-choice"
+
+            }
+
+            onClick={() =>
+
+              setTask(
+
+                "classification",
+
+              )
+
+            }
+
+          >
+
+            <strong>
+
+              Classification
+
+            </strong>
+
+
+
+            <span>
+
+              Predict a class or
+
+              category.
+
+            </span>
+
+          </button>
+
+
+
+          <button
+
+            type="button"
+
+            className={
+
+              task ===
+
+              "regression"
+
+                ? "knn-choice active"
+
+                : "knn-choice"
+
+            }
+
+            onClick={() =>
+
+              setTask(
+
+                "regression",
+
+              )
+
+            }
+
+          >
+
+            <strong>
+
+              Regression
+
+            </strong>
+
+
+
+            <span>
+
+              Predict a continuous
+
+              numerical value.
+
+            </span>
+
+          </button>
+
+        </div>
+
+      </div>
+
+
+
+      <div className="knn-card">
+
+        <p className="knn-eyebrow">
+
+          TARGET
+
+        </p>
+
+
+
+        <h2>
+
+          Select Target
+
+        </h2>
+
+
+
+        <select
+
+          value={targetColumn}
+
+          onChange={(event) =>
+
+            handleTargetChange(
+
+              event.target.value,
+
+            )
+
+          }
+
+        >
+
+          {columns.map(
+
+            (column) => (
+
+              <option
+
+                key={column}
+
+                value={column}
+
+              >
+
+                {column}
+
+              </option>
+
+            ),
+
+          )}
+
+        </select>
+
+
+
+        <p className="knn-muted">
+
+          ModelMind automatically
+
+          suggests classification or
+
+          regression when the target
+
+          changes. You can override
+
+          that suggestion above.
+
+        </p>
+
+      </div>
+
+
+
+      <div className="knn-card">
+
+        <p className="knn-eyebrow">
+
+          FEATURES
+
+        </p>
+
+
+
+        <h2>
+
+          Select Numerical Features
+
+        </h2>
+
+
+
+        <div className="knn-feature-grid">
+
+          {numericColumns
+
+            .filter(
+
+              (column) =>
+
+                column !==
+
+                targetColumn,
+
+            )
+
+            .map(
+
+              (column) => {
+
+                const selected =
+
+                  featureColumns.includes(
+
+                    column,
+
+                  );
+
+
+
+                return (
+
+                  <button
+
+                    type="button"
+
+                    key={column}
+
+                    className={
+
+                      selected
+
+                        ? "knn-feature-chip active"
+
+                        : "knn-feature-chip"
+
+                    }
+
+                    onClick={() =>
+
+                      toggleFeature(
+
+                        column,
+
+                      )
+
+                    }
+
+                  >
+
+                    {selected
+
+                      ? "✓ "
+
+                      : ""}
+
+                    {column}
+
+                  </button>
+
+                );
+
+              },
+
+            )}
+
+        </div>
+
+
+
+        <p className="knn-muted">
+
+          {
+
+            featureColumns.length
+
+          }{" "}
+
+          feature
+
+          {featureColumns.length ===
+
+          1
+
+            ? ""
+
+            : "s"}{" "}
+
+          selected
+
+        </p>
+
+      </div>
+
+
+
+      <MissingValueAnalyzer
+
+        summaries={summaries}
+
+        strategy={
+
+          missingStrategy
+
+        }
+
+        onStrategyChange={
+
+          setMissingStrategy
+
+        }
+
+      />
+
+
+
+      <ScalingAnalyzer
+
+        rows={rawRows}
+
+        featureColumns={
+
+          featureColumns
+
+        }
+
+        scalingEnabled={
+
+          scalingEnabled
+
+        }
+
+        onScalingChange={
+
+          setScalingEnabled
+
+        }
+
+      />
+
+
+
+      {task ===
+
+        "classification" && (
+
+        <div className="knn-card">
+
+          <p className="knn-eyebrow">
+
+            TARGET HEALTH
+
+          </p>
+
+
+
+          <h2>
+
+            Class Distribution
+
+          </h2>
+
+
+
+          <div className="knn-class-list">
+
+            {classCounts.map(
+
+              (item) => (
+
+                <div
+
+                  key={String(
+
+                    item.classLabel,
+
+                  )}
+
+                  className="knn-class-row"
+
+                >
+
+                  <strong>
+
+                    {String(
+
+                      item.classLabel,
+
+                    )}
+
+                  </strong>
+
+
+
+                  <div className="knn-class-bar-shell">
+
+                    <div
+
+                      className="knn-class-bar"
+
+                      style={{
+
+                        width: `${Math.max(
+
+                          2,
+
+                          item.percentage,
+
+                        )}%`,
+
+                      }}
+
+                    />
+
+                  </div>
+
+
+
+                  <span>
+
+                    {item.count} (
+
+                    {item.percentage.toFixed(
+
+                      1,
+
+                    )}
+
+                    %)
+
+                  </span>
+
+                </div>
+
+              ),
+
+            )}
+
+          </div>
+
+        </div>
+
+      )}
+
+
+
+      <div className="knn-card">
+
+        <p className="knn-eyebrow">
+
+          PREPROCESSING RESULT
+
+        </p>
+
+
+
+        <h2>
+
+          Dataset Ready Check
+
+        </h2>
+
+
+
+        <div className="knn-stat-grid">
+
+          <div className="knn-stat">
+
+            <span>
+
+              Final rows
+
+            </span>
+
+
+
+            <strong>
+
+              {
+
+                prepared.rows.length
+
+              }
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Removed rows
+
+            </span>
+
+
+
+            <strong>
+
+              {
+
+                prepared.removedRows
+
+              }
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Imputed values
+
+            </span>
+
+
+
+            <strong>
+
+              {
+
+                prepared.imputedValues
+
+              }
+
+            </strong>
+
+          </div>
+
+
+
+          <div className="knn-stat">
+
+            <span>
+
+              Scaling
+
+            </span>
+
+
+
+            <strong>
+
+              {scalingEnabled
+
+                ? "ON"
+
+                : "OFF"}
+
+            </strong>
+
+          </div>
+
+        </div>
+
+
+
+        {prepared.warnings.map(
+
+          (warning) => (
+
+            <div
+
+              key={warning}
+
+              className="knn-warning-box"
+
+            >
+
+              {warning}
+
+            </div>
+
+          ),
+
+        )}
+
+
+
+        <button
+
+          type="button"
+
+          className="knn-primary-button"
+
+          disabled={
+
+            !canUseDataset
+
+          }
+
+          onClick={() =>
+
+            onUseDataset(
+
+              prepared.rows,
+
+              featureColumns,
+
+              targetColumn,
+
+              task,
+
+              scalingEnabled,
+
+            )
+
+          }
+
+        >
+
+          Use This Dataset
+
+        </button>
+
+      </div>
+
+    </section>
+
+  );
+
+}

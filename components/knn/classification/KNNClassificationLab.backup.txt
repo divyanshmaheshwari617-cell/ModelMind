@@ -1,0 +1,161 @@
+import {
+  useMemo,
+} from "react";
+
+import type {
+  DistanceMetric,
+  KNNRow,
+  WeightingMethod,
+} from "../types/knn";
+
+import {
+  evaluateClassification,
+  predictClassification,
+  splitClassificationDataset,
+} from "../utils/knnMath";
+
+import ClassificationVoting from "./ClassificationVoting";
+
+import ClassificationMetrics from "../metrics/ClassificationMetrics";
+
+import KNN3DLivePrediction from "../neighbors/KNN3DLivePrediction";
+
+interface Props {
+  rows: KNNRow[];
+  queryFeatures: number[];
+  featureNames: string[];
+  k: number;
+  distanceMetric: DistanceMetric;
+  weighting: WeightingMethod;
+  minkowskiP: number;
+  xFeatureIndex: number;
+  yFeatureIndex: number;
+}
+
+export default function KNNClassificationLab({
+  rows,
+  queryFeatures,
+  featureNames,
+  k,
+  distanceMetric,
+  weighting,
+  minkowskiP,
+  xFeatureIndex,
+  yFeatureIndex,
+}: Props) {
+  const prediction =
+    useMemo(
+      () =>
+        predictClassification(
+          rows,
+          queryFeatures,
+          k,
+          distanceMetric,
+          weighting,
+          minkowskiP,
+        ),
+      [
+        rows,
+        queryFeatures,
+        k,
+        distanceMetric,
+        weighting,
+        minkowskiP,
+      ],
+    );
+
+  const evaluation =
+    useMemo(() => {
+      const split =
+        splitClassificationDataset(
+          rows,
+          0.25,
+        );
+
+      if (
+        split.train.length === 0 ||
+        split.test.length === 0
+      ) {
+        return null;
+      }
+
+      const safeK =
+        Math.min(
+          k,
+          split.train.length,
+        );
+
+      return evaluateClassification(
+        split.train,
+        split.test,
+        safeK,
+        distanceMetric,
+        weighting,
+        minkowskiP,
+      );
+    }, [
+      rows,
+      k,
+      distanceMetric,
+      weighting,
+      minkowskiP,
+    ]);
+
+  return (
+    <>
+      {featureNames.length >= 2 && (
+        <KNN3DLivePrediction
+          rows={rows}
+          queryFeatures={
+            queryFeatures
+          }
+          featureNames={
+            featureNames
+          }
+          task="classification"
+          k={k}
+          distanceMetric={
+            distanceMetric
+          }
+          weighting={
+            weighting
+          }
+          minkowskiP={
+            minkowskiP
+          }
+          xFeatureIndex={
+            xFeatureIndex
+          }
+          yFeatureIndex={
+            yFeatureIndex
+          }
+        />
+      )}
+
+      <ClassificationVoting
+        prediction={prediction}
+        weighting={weighting}
+      />
+
+      {evaluation ? (
+        <ClassificationMetrics
+          metrics={
+            evaluation.metrics
+          }
+        />
+      ) : (
+        <section className="knn-card">
+          <h2>
+            Classification Metrics
+          </h2>
+
+          <p className="knn-muted">
+            More data is required
+            to create a train/test
+            evaluation.
+          </p>
+        </section>
+      )}
+    </>
+  );
+}
