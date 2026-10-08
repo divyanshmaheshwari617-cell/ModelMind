@@ -40,12 +40,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "http://localhost:3000",
-    "https://modelmind-polynomial-lab.onrender.com",
-]
+        "http://localhost:3000",
+        "https://modelmind-polynomial-lab.onrender.com",
+    ],
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 
