@@ -1,0 +1,264 @@
+.svm-knowledge-studio {
+  width: min(1400px, calc(100% - 40px));
+  margin: 70px auto;
+  padding: 32px;
+  border-radius: 28px;
+  border: 1px solid rgba(139, 92, 246, .2);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(12, 16, 38, .98),
+      rgba(18, 11, 37, .98)
+    );
+}
+
+.knowledge-studio-heading > span,
+.knowledge-panel-heading > span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .15em;
+  opacity: .65;
+}
+
+.knowledge-studio-heading h2 {
+  margin: 0;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+}
+
+.knowledge-studio-heading p,
+.knowledge-panel-heading p {
+  max-width: 760px;
+  line-height: 1.7;
+  opacity: .7;
+}
+
+.knowledge-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 28px 0;
+  overflow-x: auto;
+  padding-bottom: 5px;
+}
+
+.knowledge-tabs button,
+.knowledge-action {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.035);
+  color: inherit;
+  cursor: pointer;
+}
+
+.knowledge-tabs button.active {
+  border-color: rgba(139,92,246,.9);
+  background: rgba(139,92,246,.18);
+}
+
+.knowledge-panel {
+  padding: 24px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.025);
+}
+
+.knowledge-panel-heading h3 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.math-grid,
+.mistake-grid,
+.history-grid,
+.dashboard-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.math-card,
+.mistake-card,
+.history-card,
+.dashboard-grid article {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.03);
+}
+
+.math-card > span,
+.mistake-card > span,
+.dashboard-grid article > span {
+  display: block;
+  font-size: .78rem;
+  opacity: .62;
+  margin-bottom: 9px;
+}
+
+.math-card > strong {
+  display: block;
+  margin-bottom: 12px;
+  font-family: "Courier New", monospace;
+  font-size: 1.08rem;
+}
+
+.math-card p,
+.mistake-card p {
+  margin-bottom: 0;
+  line-height: 1.6;
+  opacity: .76;
+}
+
+.explanation-list {
+  display: grid;
+  gap: 11px;
+  margin-top: 22px;
+}
+
+.explanation-item {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.03);
+}
+
+.explanation-item > strong {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(139,92,246,.16);
+}
+
+.explanation-item p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.code-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.sklearn-code {
+  margin: 22px 0 0;
+  padding: 22px;
+  overflow: auto;
+  border-radius: 16px;
+  line-height: 1.55;
+  background: rgba(0,0,0,.3);
+  border: 1px solid rgba(255,255,255,.07);
+}
+
+.mistake-card > div {
+  margin-top: 15px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(34,197,94,.06);
+  border: 1px solid rgba(34,197,94,.12);
+}
+
+.history-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.history-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.history-metrics span {
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: .75rem;
+  background: rgba(139,92,246,.1);
+}
+
+.comparison-wrap {
+  margin-top: 20px;
+  overflow-x: auto;
+}
+
+.comparison-table {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: collapse;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+.dashboard-progress {
+  margin-top: 22px;
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(139,92,246,.07);
+}
+
+.dashboard-progress > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.dashboard-progress strong {
+  font-size: 2rem;
+}
+
+.dashboard-progress-track {
+  height: 9px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+}
+
+.dashboard-progress-track > div {
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      #7c3aed,
+      #a78bfa
+    );
+}
+
+.dashboard-grid article {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dashboard-grid article strong {
+  font-size: 1.25rem;
+  text-transform: capitalize;
+}
+
+@media (max-width: 800px) {
+  .svm-knowledge-studio {
+    width: min(100% - 20px, 1400px);
+    padding: 20px;
+  }
+
+  .code-heading {
+    flex-direction: column;
+  }
+}

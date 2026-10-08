@@ -1,0 +1,346 @@
+.svm-learning-labs {
+  width: min(1400px, calc(100% - 40px));
+  margin: 70px auto;
+  padding: 32px;
+  border: 1px solid rgba(150, 120, 255, 0.2);
+  border-radius: 28px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(22, 18, 48, 0.96),
+      rgba(10, 12, 30, 0.96)
+    );
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.25);
+}
+
+.learning-labs-heading > span,
+.lab-copy > span {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.learning-labs-heading h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+}
+
+.learning-labs-heading p {
+  max-width: 760px;
+  line-height: 1.7;
+  opacity: 0.76;
+}
+
+.learning-lab-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 28px 0;
+}
+
+.learning-lab-tabs button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.learning-lab-tabs button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(167, 139, 250, 0.7);
+}
+
+.learning-lab-tabs button.active {
+  background: rgba(139, 92, 246, 0.22);
+  border-color: rgba(167, 139, 250, 0.85);
+}
+
+.learning-lab-content {
+  min-height: 500px;
+}
+
+.learning-lab-panel {
+  display: grid;
+  grid-template-columns:
+    minmax(250px, 0.72fr)
+    minmax(0, 1.6fr);
+  gap: 28px;
+  align-items: start;
+  padding: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.lab-copy h3 {
+  margin: 0 0 14px;
+  font-size: 1.7rem;
+}
+
+.lab-copy p {
+  line-height: 1.7;
+  opacity: 0.78;
+}
+
+.lab-copy.full-width {
+  grid-column: 1 / -1;
+}
+
+.concept-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.concept-box strong {
+  font-size: 1.08rem;
+}
+
+.concept-box small {
+  line-height: 1.6;
+  opacity: 0.72;
+}
+
+.interactive-control {
+  display: block;
+  margin-top: 24px;
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.interactive-control > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+
+.interactive-control output {
+  font-weight: 800;
+}
+
+.interactive-control input {
+  width: 100%;
+  cursor: pointer;
+}
+
+.kernel-comparison-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(210px, 1fr)
+    );
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.kernel-compare-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 190px;
+  padding: 20px;
+  text-align: left;
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+}
+
+.kernel-compare-card:hover,
+.kernel-compare-card.selected {
+  border-color: rgba(167, 139, 250, 0.85);
+  background: rgba(139, 92, 246, 0.11);
+}
+
+.kernel-compare-card span {
+  font-family: monospace;
+  font-size: 0.78rem;
+  opacity: 0.8;
+}
+
+.kernel-compare-card small {
+  line-height: 1.5;
+  opacity: 0.7;
+}
+
+.kernel-compare-card em {
+  margin-top: auto;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+.svm-empty-visual {
+  display: grid;
+  min-height: 400px;
+  place-items: center;
+  padding: 30px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+@media (max-width: 900px) {
+  .svm-learning-labs {
+    width: min(100% - 20px, 1400px);
+    padding: 20px;
+  }
+
+  .learning-lab-panel {
+    grid-template-columns: 1fr;
+  }
+}
+.learning-lab-live-state {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(130px, 1fr)
+    );
+  gap: 10px;
+  margin: 22px 0 18px;
+}
+
+.learning-lab-live-state > div {
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid
+    rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 23, 42, 0.92),
+      rgba(15, 23, 42, 0.55)
+    );
+}
+
+.learning-lab-live-state span,
+.learning-lab-context > div > span {
+  display: block;
+  margin-bottom: 5px;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.learning-lab-live-state strong {
+  display: block;
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.learning-lab-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 18px 0;
+  padding: 18px;
+  border: 1px solid
+    rgba(139, 92, 246, 0.22);
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(30, 41, 59, 0.74),
+      rgba(15, 23, 42, 0.72)
+    );
+}
+
+.learning-lab-context h3 {
+  margin: 0 0 6px;
+  color: #f8fafc;
+  font-size: 1.05rem;
+}
+
+.learning-lab-context p {
+  max-width: 720px;
+  margin: 0;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.learning-lab-context-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.learning-lab-context-badges span {
+  padding: 7px 10px;
+  border: 1px solid
+    rgba(139, 92, 246, 0.24);
+  border-radius: 999px;
+  background:
+    rgba(139, 92, 246, 0.1);
+  color: #ddd6fe;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.learning-lab-truth {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid
+    rgba(34, 211, 238, 0.16);
+  border-radius: 14px;
+  background:
+    rgba(8, 47, 73, 0.18);
+}
+
+.learning-lab-truth strong {
+  flex-shrink: 0;
+  color: #67e8f9;
+}
+
+.learning-lab-truth span {
+  color: #94a3b8;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .learning-lab-context {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .learning-lab-context-badges {
+    justify-content: flex-start;
+  }
+
+  .learning-lab-truth {
+    flex-direction: column;
+  }
+}
