@@ -867,12 +867,13 @@ function clamp(
   min: number,
   max: number
 ) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
   return Math.min(
     max,
-    Math.max(
-      min,
-      value
-    )
+    Math.max(min, value)
   );
 }
 

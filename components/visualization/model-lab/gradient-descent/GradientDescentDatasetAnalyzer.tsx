@@ -2397,13 +2397,12 @@ export default function GradientDescentDatasetAnalyzer({
     resetPreprocessingChoices();
 
     Papa.parse<DatasetRow>(
-      file,
-      {
-        header: true,
-        skipEmptyLines:
-          true,
-        dynamicTyping:
-          true,
+  file,
+  {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: true,
+    worker: true,
 
         complete:
           (result) => {
