@@ -58,29 +58,20 @@ app = FastAPI(
         "and visualization data."
     ),
 )
+from fastapi.middleware.cors import CORSMiddleware
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://modelmind-ensemble-web.onrender.com",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-    ],
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
     ],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
