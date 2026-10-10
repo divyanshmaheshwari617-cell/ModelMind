@@ -1,6 +1,6 @@
 
 from __future__ import annotations
-
+import os
 import warnings
 from typing import Any, Literal
 
@@ -40,14 +40,23 @@ app = FastAPI(
     version="1.0.0",
 )
 
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+
+render_frontend_url = os.getenv(
+    "BAGGING_FRONTEND_URL", ""
+).strip().rstrip("/")
+
+if render_frontend_url:
+    allowed_origins.append(render_frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
