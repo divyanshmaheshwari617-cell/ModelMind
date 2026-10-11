@@ -4,6 +4,9 @@ import {
   useMemo,
   useState,
 } from "react";
+import AdvancedClassificationEvaluationLab from "./AdvancedClassificationEvaluationLab";
+import CalibrationThresholdStudio from "./CalibrationThresholdStudio";
+import ImbalancedLearningStudio from "./ImbalancedLearningStudio";
 
 import {
   getVisualizationContent,
@@ -2959,10 +2962,10 @@ function InteractiveLab({
       );
 
     case "calibration-threshold-explorer":
-      return <ThresholdLab />;
+  return <CalibrationThresholdStudio />;
 
     case "imbalanced-learning-resampling-lab":
-      return <ImbalanceLab />;
+  return <ImbalancedLearningStudio />;
 
     case "model-interpretability-lab":
       return (
@@ -3665,6 +3668,28 @@ export default function RoadmapNativeVisualization({
   description,
   skillId,
 }: RoadmapNativeVisualizationProps) {
+    if (skillId === "advanced-classification-evaluation") {
+    return (
+      <div className="roadmap-native-visualization">
+        <div className="roadmap-native-visualization-header">
+          <div>
+            <span className="native-viz-live-badge">
+              INTERACTIVE LEARNING LAB
+            </span>
+
+            <h4>Advanced Classification Evaluation</h4>
+
+            <p>
+              Interactive confusion matrix, threshold analysis,
+              classification metrics and ROC-AUC.
+            </p>
+          </div>
+        </div>
+
+        <AdvancedClassificationEvaluationLab />
+      </div>
+    );
+  }
   const content =
     getVisualizationContent(
       visualizationId

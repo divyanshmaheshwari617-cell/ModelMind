@@ -1456,7 +1456,7 @@
 //   )}
 
 
-              
+
 
 
 
@@ -2064,7 +2064,7 @@
 //       {activeStage === "practice" && (
 
 //   <RoadmapPracticeViewer
-  
+
 
 //   problems={lesson.practice}
 
@@ -2154,6 +2154,7 @@ import {
   useState,
 
 } from "react";
+import { getLabsForSkill } from "../../data/mlLabs";
 
 import RoadmapNativeVisualization from "./visualizations/RoadmapNativeVisualization";
 
@@ -5415,43 +5416,87 @@ const completeAndContinue = () => {
 
 
 
-          {lesson.visualization
+
+{(() => {
+  const labs = getLabsForSkill(
+  lesson.skillId,
+  lesson.title
+);
 
 
+  if (labs.length === 0) {
+    return lesson.visualization?.type === "model-lab" ? (
+      <div className="lesson-model-lab-notice">
+        <p>
+          A deployed ModelMind lab has not been mapped to this
+          topic yet. You can explore the available labs in
+          the ML Labs gallery.
+        </p>
+        <a href="/labs">Browse all ML Labs →</a>
+      </div>
+    ) : null;
+  }
 
-            ?.type ===
+  return (
+    <div className="lesson-model-lab-notice">
+      <h4>Interactive ModelMind Labs</h4>
+      <p>
+        Choose the lab that matches what you are learning.
+        Each model has its own interactive experience.
+      </p>
 
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 14,
+          marginTop: 18,
+        }}
+      >
+        {labs.map((lab) => (
+          <div
+            key={lab.id}
+            style={{
+              padding: 20,
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 14,
+            }}
+          >
+            <span style={{ color: "#536ce2", fontSize: 12 }}>
+              {lab.category}
+            </span>
 
+            <h4 style={{ margin: "10px 0" }}>{lab.title}</h4>
 
-            "model-lab" && (
+            <p style={{ fontSize: 13, lineHeight: 1.6 }}>
+              {lab.description}
+            </p>
 
+            <a
+              href={lab.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-block",
+                marginTop: 12,
+                padding: "11px 16px",
+                borderRadius: 10,
+                background: "#4259d5",
+                color: "#ffffff",
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              Open {lab.title} ↗
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+})()}
 
-
-            <div className="lesson-model-lab-notice">
-
-
-
-              This lesson is connected
-
-
-
-              to a ModelMind Model Lab.
-
-
-
-              The existing lab will be
-
-
-
-              integrated here later.
-
-
-
-            </div>
-
-
-
-          )}
 
 
 
@@ -6105,103 +6150,7 @@ const completeAndContinue = () => {
 
 
 
-              <div className="lesson-code-runtime-note">
-
-
-
-                <div>
-
-
-
-                  <strong>
-
-
-
-                    Try it yourself
-
-
-
-                  </strong>
-
-
-
-
-
-
-
-                  <p>
-
-
-
-                    When this roadmap is
-
-
-
-                    integrated into ModelMind,
-
-
-
-                    this example will open in
-
-
-
-                    the existing ModelMind
-
-
-
-                    notebook so you can edit
-
-
-
-                    and run the code directly.
-
-
-
-                  </p>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  disabled
-
-
-
-                  title="Available after ModelMind notebook integration"
-
-
-
-                >
-
-
-
-                  Open in Notebook
-
-
-
-                </button>
-
-
-
-              </div>
-
-
-
-            </article>
+</article>
 
 
 

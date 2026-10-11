@@ -28,6 +28,8 @@ import {
 import RoadmapOnboarding from "./RoadmapOnboarding";
 import RoadmapAssessment from "./RoadmapAssessment";
 import PersonalizedRoadmap from "./PersonalizedRoadmap";
+import Link from "next/link";
+import { mlLabs } from "../../data/mlLabs";
 
 
 type DashboardStage =
@@ -289,6 +291,42 @@ export default function RoadmapDashboard() {
             Create New Roadmap
           </button>
         </header>
+
+<section className="roadmap-labs-banner">
+  <div className="roadmap-labs-banner-content">
+    <span className="roadmap-labs-eyebrow">
+      INTERACTIVE LEARNING EXPERIENCE
+    </span>
+
+    <h2>Explore ModelMind ML Labs</h2>
+
+    <p>
+      Learn machine learning by experimenting with real
+      interactive model visualizations. Explore regression,
+      classification, ensemble learning, neural networks,
+      clustering, dimensionality reduction and optimization.
+    </p>
+
+    <div className="roadmap-labs-banner-meta">
+      <span>◈ {mlLabs.length} Interactive Labs</span>
+      <span>◈ Model-Specific Visualizations</span>
+      <span>◈ Hands-On Learning</span>
+    </div>
+
+    <Link href="/labs" className="roadmap-labs-banner-button">
+      Explore All ML Labs
+      <span aria-hidden="true">↗</span>
+    </Link>
+  </div>
+
+  <div className="roadmap-labs-banner-visual" aria-hidden="true">
+    <div className="roadmap-labs-orbit orbit-one" />
+    <div className="roadmap-labs-orbit orbit-two" />
+    <div className="roadmap-labs-orbit orbit-three" />
+    <div className="roadmap-labs-orbit-center">ML</div>
+  </div>
+</section>
+
 
         <PersonalizedRoadmap
           roadmap={
