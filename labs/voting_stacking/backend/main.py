@@ -401,10 +401,25 @@ def create_models(req):
 
         models["stacking"] = StackingClassifier(
             estimators=create_estimators(req),
-            final_estimator=LogisticRegression(
-                max_iter=2000,
-                random_state=req.random_state,
-            ),
+            final_estimator=Pipeline([
+                (
+                    "imputer",
+                    SimpleImputer(
+                        strategy=req.missing_strategy,
+                    ),
+                ),
+                (
+                    "scaler",
+                    StandardScaler(),
+                ),
+                (
+                    "logistic",
+                    LogisticRegression(
+                        max_iter=2000,
+                        random_state=req.random_state,
+                    ),
+                ),
+            ]),
             cv=req.stacking_cv,
             stack_method="predict_proba",
             passthrough=req.stacking_passthrough,
@@ -419,12 +434,26 @@ def create_models(req):
 
         models["stacking"] = StackingRegressor(
             estimators=create_estimators(req),
-            final_estimator=Ridge(alpha=1.0),
+            final_estimator=Pipeline([
+                (
+                    "imputer",
+                    SimpleImputer(
+                        strategy=req.missing_strategy,
+                    ),
+                ),
+                (
+                    "scaler",
+                    StandardScaler(),
+                ),
+                (
+                    "ridge",
+                    Ridge(alpha=1.0),
+                ),
+            ]),
             cv=req.stacking_cv,
             passthrough=req.stacking_passthrough,
             n_jobs=1,
         )
-
     return models
 
 
