@@ -98,7 +98,8 @@ function countUnique(
 export function analyzeLinearRegressionSuitability(
   rows: DatasetRow[],
   featureColumn: string,
-  targetColumn: string
+  targetColumn: string,
+  imputationMethod: "mean" | "median" | "knn" = "median"
 ): LinearRegressionSuitabilityResult {
   const messages: SuitabilityMessage[] = [];
 
@@ -214,7 +215,7 @@ export function analyzeLinearRegressionSuitability(
     };
   }
 
-  if (featureNumericRatio < 0.8) {
+  if (featureNumericRatio === 0 || numericFeatureCount < 2) {
     messages.push({
       type: "error",
       title: "Selected feature is not numerical",
@@ -239,23 +240,182 @@ export function analyzeLinearRegressionSuitability(
    * BUILD CLEAN X/Y PAIRS
    */
 
-  const usableData: NumericDataPoint[] = [];
+  // Use observations with valid target values to
+  // determine the available feature X values.
+  // This visual lab does not have a train/test split.
+  const eligibleRows = rows.filter(
+    (row) => convertToNumber(row[targetColumn]) !== null
+  );
 
-  for (const row of rows) {
-    const x = convertToNumber(
-      row[featureColumn]
+  const observedX = eligibleRows
+    .map((row) => convertToNumber(row[featureColumn]))
+    .filter((value): value is number => value !== null)
+    .sort((a, b) => a - b);
+
+  const meanX = observedX.length
+    ? observedX.reduce((sum, x) => sum + x, 0) /
+      observedX.length
+    : null;
+
+  const middle = Math.floor(observedX.length / 2);
+
+  const medianX = !observedX.length
+    ? null
+    : observedX.length % 2
+      ? observedX[middle]
+      : (observedX[middle - 1] + observedX[middle]) / 2;
+
+  // KNN estimates X using other numeric columns.
+  // Target Y is never used as a KNN predictor.
+  const auxiliaries = Object.keys(rows[0] ?? {}).filter(
+    (name) =>
+      name !== featureColumn &&
+      name !== targetColumn &&
+      eligibleRows.filter(
+        (row) => convertToNumber(row[name]) !== null
+      ).length >= 3
+  );
+
+  const donors = eligibleRows.filter(
+    (row) =>
+      convertToNumber(row[featureColumn]) !== null
+  );
+
+  const predictMissingX = (
+    row: DatasetRow
+  ): number | null => {
+    const neighbors = donors.flatMap((donor) => {
+      let squaredDistance = 0;
+      let compared = 0;
+
+      for (const name of auxiliaries) {
+        const a = convertToNumber(row[name]);
+        const b = convertToNumber(donor[name]);
+
+        if (a === null || b === null) continue;
+
+        const values = eligibleRows
+          .map((r) => convertToNumber(r[name]))
+          .filter(
+            (v): v is number => v !== null
+          );
+
+        const span =
+          Math.max(...values) - Math.min(...values);
+
+        const difference = (a - b) / (span || 1);
+
+        squaredDistance += difference * difference;
+        compared++;
+      }
+
+      const x = convertToNumber(
+        donor[featureColumn]
+      );
+
+      return compared > 0 && x !== null
+        ? [{
+            x,
+            distance: Math.sqrt(
+              squaredDistance / compared
+            ),
+          }]
+        : [];
+    }).sort(
+      (a, b) => a.distance - b.distance
     );
 
+    if (neighbors.length < 2) return null;
+
+    const closest = neighbors.slice(
+      0,
+      Math.min(3, neighbors.length)
+    );
+
+    const exact = closest.filter(
+      (item) => item.distance === 0
+    );
+
+    if (exact.length) {
+      return exact.reduce(
+        (sum, item) => sum + item.x,
+        0
+      ) / exact.length;
+    }
+
+    const weights = closest.map(
+      (item) =>
+        1 / Math.max(item.distance, 1e-9)
+    );
+
+    const totalWeight = weights.reduce(
+      (sum, weight) => sum + weight,
+      0
+    );
+
+    const estimate = closest.reduce(
+      (sum, item, index) =>
+        sum + item.x * weights[index],
+      0
+    ) / totalWeight;
+
+    return Number.isFinite(estimate)
+      ? estimate
+      : null;
+  };
+
+  const usableData: NumericDataPoint[] = [];
+  let imputedFeatureRows = 0;
+
+  for (const row of rows) {
     const y = convertToNumber(
       row[targetColumn]
     );
 
-    if (x !== null && y !== null) {
-      usableData.push({
-        x,
-        y,
-      });
+    if (y === null) continue;
+
+    const originalX = convertToNumber(
+      row[featureColumn]
+    );
+
+    let x = originalX;
+
+    if (x === null) {
+      x = imputationMethod === "mean"
+        ? meanX
+        : imputationMethod === "median"
+          ? medianX
+          : predictMissingX(row);
+
+      if (x === null || !Number.isFinite(x)) {
+        messages.push({
+          type: "error",
+          title: "Imputation unavailable",
+          message:
+            imputationMethod === "knn"
+              ? "KNN cannot estimate all missing X values. " +
+                "Provide other numeric feature columns " +
+                "with comparable donor observations, " +
+                "or choose Mean or Median."
+              : "No valid numeric X values are " +
+                "available for imputation.",
+        });
+
+        return {
+          status: "not-suitable",
+          usableData: [],
+          totalRows: rows.length,
+          usableRows: 0,
+          removedRows: rows.length,
+          correlation: null,
+          messages,
+        };
+      }
+
+      imputedFeatureRows++;
     }
+
+    usableData.push({ x, y });
   }
 
   const removedRows =
@@ -309,18 +469,37 @@ export function analyzeLinearRegressionSuitability(
    * WARNINGS
    */
 
+  if (imputedFeatureRows > 0) {
+    const description =
+      imputationMethod === "mean"
+        ? `mean (${meanX})`
+        : imputationMethod === "median"
+          ? `median (${medianX})`
+          : "model-based KNN estimates";
+
+    messages.push({
+      type: "warning",
+      title: "Missing feature values replaced",
+      message:
+        `${imputedFeatureRows} observation(s) had ` +
+        "missing, infinite, or non-numeric X values. " +
+        `Replaced using ${description}. ` +
+        "Valid Y values were preserved.",
+    });
+  }
+
   if (removedRows > 0) {
     const removedPercent =
       (removedRows / rows.length) * 100;
 
     messages.push({
       type: "warning",
-      title: "Some rows cannot be used",
+      title: "Rows with invalid targets excluded",
       message:
         `${removedRows} row(s) (${removedPercent.toFixed(
           1
-        )}%) contain missing or non-numeric X/Y values and ` +
-        "would be excluded from this visualization.",
+        )}%) could not be used because their target Y ` +
+        "was missing or non-numeric.",
     });
   }
 

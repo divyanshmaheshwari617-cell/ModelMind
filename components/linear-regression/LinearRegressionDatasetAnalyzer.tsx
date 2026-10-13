@@ -46,6 +46,9 @@ export default function LinearRegressionDatasetAnalyzer({
   const [parseError, setParseError] =
     useState("");
 
+  const [imputationMethod, setImputationMethod] =
+    useState<"mean" | "median" | "knn">("median");
+
   const analysis = useMemo(() => {
     if (
       rows.length === 0 ||
@@ -58,12 +61,14 @@ export default function LinearRegressionDatasetAnalyzer({
     return analyzeLinearRegressionSuitability(
       rows,
       featureColumn,
-      targetColumn
+      targetColumn,
+      imputationMethod
     );
   }, [
     rows,
     featureColumn,
     targetColumn,
+    imputationMethod,
   ]);
 
   const handleFileChange = (
@@ -304,6 +309,45 @@ export default function LinearRegressionDatasetAnalyzer({
                 )}
               </select>
             </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+            <label
+              htmlFor="lr-imputation-method"
+              className="block text-sm font-bold text-slate-800"
+            >
+              Missing X Value Handling
+            </label>
+
+            <select
+              id="lr-imputation-method"
+              value={imputationMethod}
+              onChange={(event) =>
+                setImputationMethod(
+                  event.target.value as
+                    "mean" | "median" | "knn"
+                )
+              }
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800"
+            >
+              <option value="median">
+                Median (default)
+              </option>
+              <option value="mean">
+                Mean (average)
+              </option>
+              <option value="knn">
+                Model-Based KNN
+              </option>
+            </select>
+
+            <p className="mt-2 text-xs leading-5 text-slate-600">
+              Missing or infinite feature values are
+              replaced using your selected method.
+              KNN needs other numeric feature columns
+              and never uses the target as a predictor.
+              Rows with invalid targets are excluded.
+            </p>
           </div>
 
           {analysis && (
