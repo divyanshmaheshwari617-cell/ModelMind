@@ -21,7 +21,7 @@ import {
   Settings2,
 } from "lucide-react";
 
-import { getDataset, trainModel } from "@/lib/api";
+import { getDataset, trainModel, getDynamicSurface } from "@/lib/api";
 
 import type {
   DataRow,
@@ -546,6 +546,103 @@ export default function Page() {
 
   const [threeD, setThreeD] = useState(false);
 
+  const [visualAxes, setVisualAxes] =
+    useState<[string, string]>(["", ""]);
+
+  const [visualSurface, setVisualSurface] =
+    useState<TrainResult["surface"]>(null);
+
+  const [surfaceLoading, setSurfaceLoading] =
+    useState(false);
+
+  const [surfaceError, setSurfaceError] =
+    useState("");
+
+  const surfaceRequestId = useRef(0);
+
+  const trainedNumericFeatures =
+    result?.numeric_features ??
+    result?.preprocessing.numeric ??
+    [];
+
+  const activeSurface =
+    visualSurface ?? result?.surface ?? null;
+
+  // Invalidate pending requests if the model is cleared.
+  useEffect(() => {
+    if (!result) {
+      surfaceRequestId.current += 1;
+      setVisualSurface(null);
+      setSurfaceLoading(false);
+      setSurfaceError("");
+    }
+  }, [result]);
+
+  // Change the surface using the already-trained model.
+  // This function NEVER calls trainModel().
+  function changeVisualAxis(
+    axis: 0 | 1,
+    feature: string
+  ) {
+    if (
+      !result?.session_id ||
+      surfaceLoading ||
+      !trainedNumericFeatures.includes(feature)
+    ) {
+      return;
+    }
+
+    const next: [string, string] = [...visualAxes];
+
+    next[axis] = feature;
+
+    if (
+      !next[0] ||
+      !next[1] ||
+      next[0] === next[1]
+    ) {
+      return;
+    }
+
+    if (
+      next[0] === visualAxes[0] &&
+      next[1] === visualAxes[1]
+    ) {
+      return;
+    }
+
+    setVisualAxes(next);
+    setSurfaceLoading(true);
+    setSurfaceError("");
+
+    const requestId = ++surfaceRequestId.current;
+
+    void getDynamicSurface({
+      session_id: result.session_id,
+      feature_x: next[0],
+      feature_y: next[1],
+    })
+      .then((surface) => {
+        if (surfaceRequestId.current === requestId) {
+          setVisualSurface(surface);
+        }
+      })
+      .catch((error: unknown) => {
+        if (surfaceRequestId.current === requestId) {
+          setSurfaceError(
+            error instanceof Error
+              ? error.message
+              : String(error)
+          );
+        }
+      })
+      .finally(() => {
+        if (surfaceRequestId.current === requestId) {
+          setSurfaceLoading(false);
+        }
+      });
+  }
+
   const [tab, setTab] = useState<
     "visualize" | "metrics" | "explain" | "predictions"
   >("visualize");
@@ -731,6 +828,10 @@ export default function Page() {
       return;
     }
 
+    surfaceRequestId.current += 1;
+    setSurfaceLoading(false);
+    setSurfaceError("");
+
     setLoading(true);
     setErr("");
     setPlaying(false);
@@ -766,6 +867,17 @@ export default function Page() {
       const response = await trainModel(input);
 
       setResult(response);
+
+      setVisualSurface(response.surface);
+
+      setVisualAxes([
+        response.surface?.feature_x ??
+          response.numeric_features?.[0] ??
+          "",
+        response.surface?.feature_y ??
+          response.numeric_features?.[1] ??
+          "",
+      ]);
 
       setStage(
         Math.max(0, response.stages.length - 1)
@@ -1630,7 +1742,7 @@ export default function Page() {
                       </Card>
                     </div>
 
-                    {result.surface && (
+                    {activeSurface && (
                       <Card
                         title="Decision boundary / regression surface"
                         desc="Plot two chosen numeric axes; other training features are held at representative values"
@@ -1660,11 +1772,121 @@ export default function Page() {
                           </div>
                         }
                       >
+                        <div
+                          className="plot-selection"
+                          style={{ marginBottom: 16 }}
+                        >
+                          <h3>
+                            Explore the trained model
+                          </h3>
+
+                          <p className="small">
+                            Change X and Y without retraining AdaBoost.
+                          </p>
+
+                          <div className="formrow">
+                            <label>
+                              X-axis (input feature)
+
+                              <select
+                                aria-label="Visualization X-axis"
+                                value={visualAxes[0]}
+                                disabled={
+                                  surfaceLoading ||
+                                  !result.session_id
+                                }
+                                onChange={(event) =>
+                                  changeVisualAxis(
+                                    0,
+                                    event.target.value
+                                  )
+                                }
+                              >
+                                {trainedNumericFeatures.map(
+                                  (feature) => (
+                                    <option
+                                      key={feature}
+                                      value={feature}
+                                      disabled={
+                                        feature === visualAxes[1]
+                                      }
+                                    >
+                                      {feature}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            </label>
+
+                            <label>
+                              Y-axis (input feature)
+
+                              <select
+                                aria-label="Visualization Y-axis"
+                                value={visualAxes[1]}
+                                disabled={
+                                  surfaceLoading ||
+                                  !result.session_id
+                                }
+                                onChange={(event) =>
+                                  changeVisualAxis(
+                                    1,
+                                    event.target.value
+                                  )
+                                }
+                              >
+                                {trainedNumericFeatures.map(
+                                  (feature) => (
+                                    <option
+                                      key={feature}
+                                      value={feature}
+                                      disabled={
+                                        feature === visualAxes[0]
+                                      }
+                                    >
+                                      {feature}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            </label>
+                          </div>
+
+                          <p className="small">
+                            Z-axis (3D):{" "}
+                            {result.task === "regression"
+                              ? `Predicted ${result.target}`
+                              : result.classes.length === 2
+                              ? `Probability of ${result.target} = ${result.classes[1]}`
+                              : `Predicted ${result.target} class index`}
+                          </p>
+
+                          {surfaceLoading && (
+                            <p className="small" role="status">
+                              Updating prediction surface…
+                            </p>
+                          )}
+
+                          {surfaceError && (
+                            <p className="error" role="alert">
+                              {surfaceError}
+                            </p>
+                          )}
+
+                          {!result.session_id && (
+                            <p className="small">
+                              Train with the updated backend
+                              to enable live axis switching.
+                            </p>
+                          )}
+                        </div>
+
                         <SurfaceChart
-                          surface={result.surface}
+                          surface={activeSurface}
                           task={result.task}
                           classes={result.classes}
                           threeD={threeD}
+                          target={result.target}
                         />
 
                         <p className="small">
@@ -1677,7 +1899,7 @@ export default function Page() {
                       </Card>
                     )}
 
-                    {!result.surface && (
+                    {!activeSurface && (
                       <div className="notice">
                         <Info size={17} />
                         Select at least two numeric predictors

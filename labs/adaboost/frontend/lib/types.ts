@@ -41,23 +41,68 @@ export type FeatureImportance = {
   value: number;
 };
 
-
+/**
+ * Prediction surface produced by an already-trained
+ * AdaBoost model.
+ *
+ * X and Y are numeric input features.
+ * Z always represents the model prediction:
+ *
+ * - Regression: predicted target value.
+ * - Binary classification: positive-class probability.
+ * - Multiclass classification: predicted class index.
+ *
+ * Changing X/Y does not require model retraining.
+ */
 export type SurfaceData = {
   x: number[];
   y: number[];
   z: number[][];
+
   points: {
     x: number;
     y: number;
     label: string | number;
   }[];
+
   mode: string;
+
   feature_x: string;
   feature_y: string;
+
   fixed_features: Record<string, string | number>;
+
+  /**
+   * Human-readable Z-axis label returned by the new
+   * dynamic surface endpoint.
+   *
+   * Optional for compatibility with existing surfaces.
+   */
+  target_axis?: string;
 };
 
+/**
+ * Request a new visualization from a fitted model.
+ *
+ * POST /api/surface
+ *
+ * This endpoint performs prediction only.
+ * It does not fit AdaBoost again.
+ */
+export type SurfaceRequest = {
+  session_id: string;
+  feature_x: string;
+  feature_y: string;
+};
 
+/**
+ * Returned from POST /api/surface.
+ */
+export type SurfaceResponse = SurfaceData;
+
+/**
+ * Boosting diagnostics sample metadata.
+ */
 export type BoostingSample = {
   position: number;
   row_index: string;
@@ -86,21 +131,48 @@ export type BoostingDiagnosticRound = {
 
 export type BoostingDiagnostics = {
   task: Task;
+
   total_train_samples: number;
   total_estimators: number;
   returned_rounds: number;
   sample_count: number;
-  weight_method: "samme_reconstructed" | "unavailable";
+
+  weight_method:
+    | "samme_reconstructed"
+    | "unavailable";
+
   weight_note: string;
+
   plot_features: string[];
+
   samples: BoostingSample[];
   rounds: BoostingDiagnosticRound[];
 };
 
+/**
+ * Main training API response.
+ *
+ * The new backend returns session_id and numeric_features
+ * in addition to the original response fields.
+ */
 export type TrainResult = {
   task: Task;
   target: string;
   features: string[];
+
+  /**
+   * Identifies the fitted model stored temporarily
+   * on the FastAPI backend.
+   *
+   * Used when requesting different visualization axes.
+   */
+  session_id?: string;
+
+  /**
+   * Numeric input features available for the
+   * visualization X/Y selectors.
+   */
+  numeric_features?: string[];
 
   rows: {
     total: number;
@@ -118,26 +190,35 @@ export type TrainResult = {
   };
 
   stages: Stage[];
+
   actual_estimators: number;
 
   boosting_diagnostics?: BoostingDiagnostics;
 
   importance: FeatureImportance[];
+
   predictions: PredictionRecord[];
 
   confusion_matrix: number[][] | null;
 
+  /**
+   * Initial prediction surface returned during training.
+   */
   surface: SurfaceData | null;
 
   preprocessing: {
     numeric: string[];
     categorical: string[];
+
     missing_cells: number;
     dropped_target_rows: number;
     dropped_feature_rows?: number;
+
     missing_strategy?: string;
     categorical_missing_strategy?: string;
+
     feature_strategies?: Record<string, string>;
+
     numeric_missing: Record<string, number>;
     categorical_missing: Record<string, number>;
   };
@@ -145,6 +226,12 @@ export type TrainResult = {
   hyperparameters: Record<string, unknown>;
 };
 
+/**
+ * AdaBoost training request.
+ *
+ * plot_features still specifies the initial X/Y pair.
+ * Subsequent axis changes use SurfaceRequest.
+ */
 export type TrainConfig = {
   rows: DataRow[];
   features: string[];

@@ -34,6 +34,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 from boosting_diagnostics import build_boosting_diagnostics
+from surface_sessions import router as surface_router, create_surface_session
 
 
 app = FastAPI(
@@ -465,6 +466,8 @@ def get_dataset(
 # ============================================================
 # HEALTH ENDPOINT
 # ============================================================
+
+app.include_router(surface_router)
 
 @app.get("/api/health")
 def health():
@@ -1391,6 +1394,17 @@ def train(req: TrainRequest):
     # FINAL RESPONSE
     # --------------------------------------------------------
 
+    # Cache the already-fitted pipeline.
+    # Changing axes never calls fit() again.
+    surface_session_id = create_surface_session(
+        pipeline=pipe,
+        X_train=X_train,
+        y_train=y_train,
+        task=req.task,
+        numeric_features=numerical,
+        classes=[str(value) for value in classes],
+    )
+
     return json_safe({
         "task": req.task,
         "target": req.target,
@@ -1416,6 +1430,8 @@ def train(req: TrainRequest):
         "predictions": preview,
         "confusion_matrix": confusion,
         "surface": surface,
+        "session_id": surface_session_id,
+        "numeric_features": numerical,
         "preprocessing": {
             "numeric": numerical,
             "categorical": categorical,

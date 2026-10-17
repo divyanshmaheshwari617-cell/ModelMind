@@ -43,6 +43,11 @@ const clamp = (
   maximum: number
 ) => Math.max(minimum, Math.min(maximum, value));
 
+const shortLabel = (value: string, max = 24) =>
+  value.length > max
+    ? `${value.slice(0, max - 1)}…`
+    : value;
+
 // ============================================================
 // LEARNING CURVE
 // ============================================================
@@ -243,6 +248,7 @@ type SurfaceProps = {
   task: TrainResult["task"];
   classes: string[];
   threeD: boolean;
+  target?: string;
 };
 
 type ProjectedPoint = {
@@ -267,23 +273,28 @@ export function SurfaceChart({
   task,
   classes,
   threeD,
+  target = "Target",
 }: SurfaceProps) {
   const [rotation, setRotation] = useState(35);
   const [elevation, setElevation] = useState(29);
-
-  // ----------------------------------------------------------
-  // GRID DIMENSIONS
-  // ----------------------------------------------------------
 
   const nx = surface.x.length;
   const ny = surface.y.length;
 
   // ----------------------------------------------------------
+  // DETERMINE Z-AXIS MEANING
+  // ----------------------------------------------------------
+
+  const zLabel =
+    surface.target_axis ||
+    (task === "regression"
+      ? `Predicted ${target}`
+      : surface.mode === "probability"
+      ? `P(${classes[1] ?? "positive class"})`
+      : `Predicted ${target} class index`);
+
+  // ----------------------------------------------------------
   // NORMALIZE BACKEND PREDICTIONS
-  //
-  // Runtime validation is intentional:
-  // JSON can contain null even when TypeScript expects number.
-  // Multiclass predictions may also contain class labels.
   // ----------------------------------------------------------
 
   const normalized = useMemo(() => {
@@ -305,8 +316,6 @@ export function SurfaceChart({
         return null;
       }
 
-      // Classification predictions are class labels.
-      // Convert known labels into numerical indices.
       if (classificationLabels) {
         const index = classIndex.get(String(raw));
 
@@ -359,7 +368,6 @@ export function SurfaceChart({
 
     return {
       grid,
-      validValues,
       minimum,
       maximum,
       validCount: validValues.length,
@@ -420,10 +428,6 @@ export function SurfaceChart({
     };
   }, [surface.x, surface.y, nx, ny]);
 
-  // ----------------------------------------------------------
-  // NORMALIZATION
-  // ----------------------------------------------------------
-
   const lo = normalized.minimum ?? 0;
   const hi = normalized.maximum ?? 1;
 
@@ -433,17 +437,10 @@ export function SurfaceChart({
     normalized.validCount > 0 &&
     Math.abs(hi - lo) < 1e-9;
 
-  const normalizeZ = (z: number) => {
-    if (constantSurface) {
-      return 0.5;
-    }
-
-    return clamp(
-      (z - lo) / zRange,
-      0,
-      1
-    );
-  };
+  const normalizeZ = (z: number) =>
+    constantSurface
+      ? 0.5
+      : clamp((z - lo) / zRange, 0, 1);
 
   const xToU = (x: number) =>
     (x - axes.minimumX) / axes.rangeX;
@@ -451,20 +448,12 @@ export function SurfaceChart({
   const yToV = (y: number) =>
     (y - axes.minimumY) / axes.rangeY;
 
-  // ----------------------------------------------------------
-  // COLOR MAPPING
-  // ----------------------------------------------------------
-
   const shade = (z: number): string => {
     const t = normalizeZ(z);
 
-    return `hsl(${
-      220 - 175 * t
-    }, ${
+    return `hsl(${220 - 175 * t}, ${
       65 + 10 * t
-    }%, ${
-      30 + 25 * t
-    }%)`;
+    }%, ${30 + 25 * t}%)`;
   };
 
   // ----------------------------------------------------------
@@ -492,21 +481,17 @@ export function SurfaceChart({
 
     const height = normalizeZ(z) - 0.5;
 
-    const px = 450 + rotatedX * 530;
-
-    const py =
-      270 +
-      rotatedY * Math.sin(tilt) * 340 -
-      height * Math.cos(tilt) * 240;
-
     return {
-      x: px,
-      y: py,
+      x: 450 + rotatedX * 530,
+      y:
+        270 +
+        rotatedY * Math.sin(tilt) * 340 -
+        height * Math.cos(tilt) * 240,
     };
   };
 
   // ----------------------------------------------------------
-  // GENERATE VALID SURFACE POLYGONS
+  // BUILD 3D SURFACE POLYGONS
   // ----------------------------------------------------------
 
   const polygons = useMemo(() => {
@@ -576,15 +561,24 @@ export function SurfaceChart({
             0
           ) / 4;
 
+        const t = constantSurface
+          ? 0.5
+          : clamp(
+              (averageZ - lo) / zRange,
+              0,
+              1
+            );
+
         output.push({
           key: `${i}-${j}`,
           points: points
-            .map(
-              (point) =>
-                `${point.x},${point.y}`
+            .map((point) =>
+              `${point.x},${point.y}`
             )
             .join(" "),
-          fill: shade(averageZ),
+          fill: `hsl(${220 - 175 * t}, ${
+            65 + 10 * t
+          }%, ${30 + 25 * t}%)`,
           depth,
           z: averageZ,
         });
@@ -603,7 +597,57 @@ export function SurfaceChart({
     rotation,
     elevation,
     lo,
+    zRange,
+    constantSurface,
+  ]);
+
+  // ----------------------------------------------------------
+  // 3D AXES AND AXIS ENDPOINT LABELS
+  // ----------------------------------------------------------
+
+  const axisLines = useMemo(() => {
+    const origin = project(
+      0,
+      0,
+      lo
+    );
+
+    const xEnd = project(
+      1,
+      0,
+      lo
+    );
+
+    const yEnd = project(
+      0,
+      1,
+      lo
+    );
+
+    const zEnd = project(
+      0,
+      0,
+      hi
+    );
+
+    // On a constant surface, draw a visible Z direction
+    // rather than collapsing the Z axis to zero length.
+    if (constantSurface) {
+      zEnd.y = origin.y - 160;
+    }
+
+    return {
+      origin,
+      xEnd,
+      yEnd,
+      zEnd,
+    };
+  }, [
+    rotation,
+    elevation,
+    lo,
     hi,
+    constantSurface,
   ]);
 
   // ----------------------------------------------------------
@@ -619,10 +663,6 @@ export function SurfaceChart({
       ),
     [surface.points]
   );
-
-  // ----------------------------------------------------------
-  // VALIDATION STATUS
-  // ----------------------------------------------------------
 
   const noValues =
     normalized.validCount === 0;
@@ -644,39 +684,27 @@ export function SurfaceChart({
   return (
     <div
       className="chart"
-      style={{
-        overflow: "hidden",
-      }}
+      style={{ overflow: "hidden" }}
     >
-      {/* INFORMATION HEADER */}
-
       <div
         className="small"
-        style={{
-          marginBottom: 12,
-        }}
+        style={{ marginBottom: 12 }}
       >
         X: {surface.feature_x}
         {" · "}
         Y: {surface.feature_y}
         {" · "}
-        {surface.mode === "probability"
-          ? "Probability"
-          : normalized.classificationLabels
-          ? "Predicted class"
-          : "Predicted value"}
+        {threeD
+          ? `Z: ${zLabel}`
+          : `Color: ${zLabel}`}
         {" · "}
         {nx} × {ny} grid
       </div>
 
-      {/* ROTATION AND ELEVATION */}
-
       {threeD && (
         <div
           className="formrow"
-          style={{
-            marginBottom: 12,
-          }}
+          style={{ marginBottom: 12 }}
         >
           <label>
             Rotate
@@ -714,8 +742,6 @@ export function SurfaceChart({
         </div>
       )}
 
-      {/* EMPTY OR INVALID GRID */}
-
       {unavailable ? (
         <div
           style={{
@@ -740,8 +766,8 @@ export function SurfaceChart({
             {!axes.valid
               ? "The backend returned invalid or insufficient X/Y grid coordinates."
               : noValues
-              ? "The backend did not return any finite numerical or recognized class values for this prediction surface."
-              : "The prediction grid does not contain enough adjacent valid cells to construct a 3D surface."}
+              ? "The backend did not return finite numerical or recognized class predictions."
+              : "There are not enough adjacent valid grid cells to construct a 3D surface."}
           </p>
 
           <p
@@ -750,8 +776,7 @@ export function SurfaceChart({
               fontSize: 13,
             }}
           >
-            This is a visualization-data issue.
-            It does not necessarily mean model
+            This does not necessarily mean model
             training failed.
           </p>
         </div>
@@ -766,8 +791,8 @@ export function SurfaceChart({
           role="img"
           aria-label={
             threeD
-              ? "Interactive projected 3D AdaBoost prediction surface"
-              : "2D AdaBoost prediction heatmap with observed samples"
+              ? `3D AdaBoost surface. X: ${surface.feature_x}, Y: ${surface.feature_y}, Z: ${zLabel}`
+              : `2D AdaBoost heatmap. X: ${surface.feature_x}, Y: ${surface.feature_y}, Color: ${zLabel}`
           }
           style={{
             display: "block",
@@ -788,10 +813,111 @@ export function SurfaceChart({
                   strokeWidth={0.7}
                 >
                   <title>
-                    Prediction: {fmt(polygon.z)}
+                    {zLabel}: {fmt(polygon.z)}
                   </title>
                 </polygon>
               ))}
+
+              {/* VISIBLE 3D AXIS LINES */}
+
+              <g
+                strokeWidth={2.5}
+                strokeLinecap="round"
+              >
+                <line
+                  x1={axisLines.origin.x}
+                  y1={axisLines.origin.y}
+                  x2={axisLines.xEnd.x}
+                  y2={axisLines.xEnd.y}
+                  stroke="#5fe1ce"
+                />
+
+                <line
+                  x1={axisLines.origin.x}
+                  y1={axisLines.origin.y}
+                  x2={axisLines.yEnd.x}
+                  y2={axisLines.yEnd.y}
+                  stroke="#a78bfa"
+                />
+
+                <line
+                  x1={axisLines.origin.x}
+                  y1={axisLines.origin.y}
+                  x2={axisLines.zEnd.x}
+                  y2={axisLines.zEnd.y}
+                  stroke="#fbbf7b"
+                />
+              </g>
+
+              {/* 3D AXIS NAMES */}
+
+              <g
+                fill="#f8fafc"
+                fontSize={14}
+                fontWeight={600}
+              >
+                <text
+                  x={axisLines.xEnd.x + 14}
+                  y={axisLines.xEnd.y + 20}
+                  textAnchor="middle"
+                >
+                  X: {shortLabel(surface.feature_x)}
+                </text>
+
+                <text
+                  x={axisLines.yEnd.x - 14}
+                  y={axisLines.yEnd.y + 20}
+                  textAnchor="middle"
+                >
+                  Y: {shortLabel(surface.feature_y)}
+                </text>
+
+                <text
+                  x={axisLines.zEnd.x - 12}
+                  y={axisLines.zEnd.y - 16}
+                  textAnchor="end"
+                >
+                  Z: {shortLabel(zLabel, 36)}
+                </text>
+              </g>
+
+              {/* 3D AXIS VALUES */}
+
+              <g
+                fill="#b8c8dd"
+                fontSize={11}
+              >
+                <text
+                  x={axisLines.origin.x + 8}
+                  y={axisLines.origin.y + 18}
+                >
+                  {fmt(axes.minimumX)}
+                </text>
+
+                <text
+                  x={axisLines.xEnd.x + 8}
+                  y={axisLines.xEnd.y + 37}
+                  textAnchor="middle"
+                >
+                  {fmt(axes.maximumX)}
+                </text>
+
+                <text
+                  x={axisLines.yEnd.x - 8}
+                  y={axisLines.yEnd.y + 37}
+                  textAnchor="middle"
+                >
+                  {fmt(axes.maximumY)}
+                </text>
+
+                <text
+                  x={axisLines.zEnd.x - 10}
+                  y={axisLines.zEnd.y + 3}
+                  textAnchor="end"
+                >
+                  {fmt(hi)}
+                </text>
+              </g>
 
               <text
                 x="30"
@@ -799,7 +925,7 @@ export function SurfaceChart({
                 fill="#d5e1f3"
                 fontSize="17"
               >
-                AdaBoost surface · rotate and tilt above
+                AdaBoost prediction surface
               </text>
             </>
           ) : (
@@ -833,7 +959,7 @@ export function SurfaceChart({
                         fill={shade(z)}
                       >
                         <title>
-                          Prediction: {fmt(z)}
+                          {zLabel}: {fmt(z)}
                         </title>
                       </rect>
                     );
@@ -862,12 +988,73 @@ export function SurfaceChart({
                     strokeWidth={0.7}
                   >
                     <title>
+                      Actual {target}:{" "}
                       {String(point.label)}
                     </title>
                   </circle>
                 ))}
 
-              {/* AXIS LABELS */}
+              {/* 2D AXIS LINES */}
+
+              <g
+                stroke="#8394ae"
+                strokeWidth={1.5}
+              >
+                <line
+                  x1="85"
+                  y1="455"
+                  x2="815"
+                  y2="455"
+                />
+
+                <line
+                  x1="85"
+                  y1="45"
+                  x2="85"
+                  y2="455"
+                />
+              </g>
+
+              {/* 2D AXIS END VALUES */}
+
+              <g
+                fill="#a7b7d0"
+                fontSize={12}
+              >
+                <text
+                  x="85"
+                  y="474"
+                  textAnchor="middle"
+                >
+                  {fmt(axes.minimumX)}
+                </text>
+
+                <text
+                  x="815"
+                  y="474"
+                  textAnchor="middle"
+                >
+                  {fmt(axes.maximumX)}
+                </text>
+
+                <text
+                  x="76"
+                  y="48"
+                  textAnchor="end"
+                >
+                  {fmt(axes.minimumY)}
+                </text>
+
+                <text
+                  x="76"
+                  y="458"
+                  textAnchor="end"
+                >
+                  {fmt(axes.maximumY)}
+                </text>
+              </g>
+
+              {/* 2D AXIS LABELS */}
 
               <text
                 x="450"
@@ -875,8 +1062,9 @@ export function SurfaceChart({
                 textAnchor="middle"
                 fill="#d5e1f3"
                 fontSize="16"
+                fontWeight={600}
               >
-                {surface.feature_x}
+                X: {surface.feature_x}
               </text>
 
               <text
@@ -886,15 +1074,16 @@ export function SurfaceChart({
                 textAnchor="middle"
                 fill="#d5e1f3"
                 fontSize="16"
+                fontWeight={600}
               >
-                {surface.feature_y}
+                Y: {surface.feature_y}
               </text>
             </>
           )}
         </svg>
       )}
 
-      {/* RANGE INFORMATION */}
+      {/* PREDICTION RANGE AND EXPLANATION */}
 
       <p
         className="small"
@@ -911,42 +1100,35 @@ export function SurfaceChart({
         complete trained model; other predictors
         are held at representative training values.
         {threeD
-          ? " Use rotation and elevation controls to explore the 3D surface."
+          ? " Use rotation and elevation controls to explore the surface."
           : ""}
       </p>
-
-      {/* CONSTANT SURFACE EXPLANATION */}
 
       {constantSurface && !unavailable && (
         <p
           className="small"
-          style={{
-            color: "#8ee5d9",
-          }}
+          style={{ color: "#8ee5d9" }}
         >
           All valid predictions on this grid are
-          identical. A flat surface is expected
-          for this model and selected feature range.
+          identical. A flat prediction surface is
+          expected for this model and selected
+          feature range.
         </p>
       )}
-
-      {/* INVALID DATA INFORMATION */}
 
       {normalized.invalidCount > 0 && (
         <p
           className="small"
-          style={{
-            color: "#fbbf7b",
-          }}
+          style={{ color: "#fbbf7b" }}
         >
           {normalized.invalidCount} of {nx * ny}
           {" "}grid values could not be rendered.
-          Missing and invalid values are not
-          silently replaced with fabricated predictions.
+          Invalid values are not replaced with
+          fabricated predictions.
         </p>
       )}
 
-      {/* MULTICLASS LEGEND */}
+      {/* MULTICLASS CLASS INDEX LEGEND */}
 
       {normalized.classificationLabels &&
         classes.length > 0 && (

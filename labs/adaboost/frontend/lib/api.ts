@@ -3,6 +3,8 @@ import type {
   DataSet,
   TrainConfig,
   TrainResult,
+  SurfaceRequest,
+  SurfaceResponse,
 } from "./types";
 
 const API = (
@@ -45,13 +47,36 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
+/**
+ * Load a built-in dataset.
+ */
 export const getDataset = (id: string) =>
   request<DataSet>(
     `/api/datasets/${encodeURIComponent(id)}`
   );
 
+/**
+ * Train AdaBoost once.
+ */
 export const trainModel = (config: TrainConfig) =>
   request<TrainResult>("/api/train", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(config),
+  });
+
+/**
+ * Recalculate a 2D/3D prediction surface
+ * using an ALREADY-TRAINED AdaBoost model.
+ *
+ * No training is performed.
+ */
+export const getDynamicSurface = (
+  config: SurfaceRequest
+) =>
+  request<SurfaceResponse>("/api/surface", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

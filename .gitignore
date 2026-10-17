@@ -57,3 +57,22 @@ components.zip
 lib.zip
 # ModelMind local secrets
 backend/.modelmind/
+# ==========================================
+# ModelMind AdaBoost Lab
+# ==========================================
+
+# Python virtual environment and test files
+/labs/adaboost/backend/.venv/
+/labs/adaboost/backend/.pytest_cache/
+/labs/adaboost/backend/*.bak
+
+# Next.js generated files
+/labs/adaboost/frontend/node_modules/
+/labs/adaboost/frontend/.next/
+/labs/adaboost/frontend/out/
+
+# Backup files
+/labs/adaboost/frontend/*.bak
+
+# Local configuration
+/labs/adaboost/frontend/.env.local
