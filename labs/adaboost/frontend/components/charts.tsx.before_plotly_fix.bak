@@ -1,0 +1,28 @@
+"use client";
+import dynamic from 'next/dynamic';
+import {CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis,YAxis,Legend,BarChart,Bar,ScatterChart,Scatter,ZAxis} from 'recharts';
+import type {TrainResult,Stage} from '@/lib/types';
+const Plot=dynamic(()=>import('react-plotly.js'),{ssr:false});
+const fmt=(v:number)=>Number.isFinite(v)?v.toFixed(3):'—';
+export function LearningCurve({data,metric,active}:{data:Stage[];metric:string;active:number}){
+ const chart=data.map(s=>({round:s.round,train:s.train[metric],test:s.test[metric]}));
+ return <div className="chart"><ResponsiveContainer width="100%" height={300}><LineChart data={chart}><CartesianGrid strokeDasharray="3 5" stroke="#24334a"/><XAxis dataKey="round" tick={{fill:'#8394ae'}}/><YAxis tick={{fill:'#8394ae'}} domain={['auto','auto']}/><Tooltip contentStyle={{background:'#172337',border:'1px solid #33435b',borderRadius:12}}/><Legend/><Line dataKey="train" name="Training" stroke="#5fe1ce" dot={false} strokeWidth={2}/><Line dataKey="test" name="Testing" stroke="#a78bfa" dot={false} strokeWidth={2}/></LineChart></ResponsiveContainer><p className="small">Selected round: {active+1} / {data.length}. Final scores use all fitted rounds.</p></div>;
+}
+export function WeightChart({data,active}:{data:Stage[];active:number}){
+ const bars=data.slice(0,active+1).map(s=>({round:s.round,weight:s.weight,error:s.error}));
+ return <div className="chart"><ResponsiveContainer width="100%" height={260}><BarChart data={bars}><CartesianGrid strokeDasharray="3 5" stroke="#24334a"/><XAxis dataKey="round" tick={{fill:'#8394ae'}}/><YAxis tick={{fill:'#8394ae'}}/><Tooltip contentStyle={{background:'#172337',border:'1px solid #33435b',borderRadius:12}}/><Bar dataKey="weight" name="Estimator weight" fill="#4dd9c0" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer><p className="small">Estimator weights are returned by scikit-learn. For regression they reflect the fitted AdaBoost.R2 ensemble.</p></div>;
+}
+export function ImportanceChart({data}:{data:TrainResult['importance']}){
+ return <div className="chart"><ResponsiveContainer width="100%" height={Math.max(230,data.length*29)}><BarChart layout="vertical" data={[...data].reverse()} margin={{left:10,right:25}}><XAxis type="number" tick={{fill:'#8394ae'}}/><YAxis type="category" dataKey="feature" width={128} tick={{fill:'#d5e1f3',fontSize:11}}/><Tooltip contentStyle={{background:'#172337',border:'1px solid #33435b'}}/><Bar dataKey="value" fill="#a78bfa" radius={[0,5,5,0]}/></BarChart></ResponsiveContainer></div>;
+}
+export function SurfaceChart({surface,task,classes,threeD}:{surface:NonNullable<TrainResult['surface']>;task:TrainResult['task'];classes:string[];threeD:boolean}){
+ const fig=threeD ? [
+ {type:'surface' as const,x:surface.x,y:surface.y,z:surface.z,colorscale:'Viridis',opacity:.9,showscale:true,name:'AdaBoost surface'},
+ {type:'scatter3d' as const,mode:'markers' as const,x:surface.points.map(p=>p.x),y:surface.points.map(p=>p.y),z:surface.points.map(p=>task==='regression'?Number(p.label):Math.max(0,classes.indexOf(String(p.label)))),marker:{size:3,color:'#e5eefb',opacity:.7},name:'Observed samples'}
+ ] : [
+ {type:'heatmap' as const,x:surface.x,y:surface.y,z:surface.z,colorscale:'Viridis',opacity:.72,showscale:true,name:'Model output'},
+ {type:'scatter' as const,mode:'markers' as const,x:surface.points.map(p=>p.x),y:surface.points.map(p=>p.y),marker:{size:6,color:surface.points.map(p=>task==='regression'?Number(p.label):Math.max(0,classes.indexOf(String(p.label)))),colorscale:'Portland',line:{width:.6,color:'#172337'}},name:'Samples',text:surface.points.map(p=>String(p.label))}
+ ];
+ return <div className="plot"><Plot data={fig as never} layout={{autosize:true,paper_bgcolor:'#111c2f',plot_bgcolor:'#111c2f',font:{color:'#d5e1f3'},margin:threeD?{l:0,r:0,t:18,b:0}:{l:55,r:20,t:15,b:50},scene:threeD?{xaxis:{title:surface.feature_x},yaxis:{title:surface.feature_y},zaxis:{title:'Prediction'}}:undefined,xaxis:threeD?undefined:{title:surface.feature_x,gridcolor:'#2b3a52'},yaxis:threeD?undefined:{title:surface.feature_y,gridcolor:'#2b3a52'},showlegend:false}} style={{width:'100%',height:threeD?450:390}} config={{responsive:true,displaylogo:false}} useResizeHandler/></div>;
+}
+export const pretty=(x:number|null|undefined)=>x==null?'—':fmt(x);

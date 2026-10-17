@@ -1,0 +1,230 @@
+"""ModelMind AdaBoost lab API. Python 3.11+, scikit-learn >=1.4."""
+from __future__ import annotations
+
+import io
+import math
+from collections import Counter
+from typing import Any, Literal
+
+import numpy as np
+import pandas as pd
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from sklearn.compose import ColumnTransformer
+from sklearn.datasets import make_classification, make_friedman1, make_moons
+from sklearn.ensemble import AdaBoostClassifier, AdaBoostRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import (accuracy_score, confusion_matrix, f1_score, mean_absolute_error,
+                             mean_squared_error, precision_score, r2_score, recall_score, roc_auc_score)
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+
+app = FastAPI(title="ModelMind AdaBoost Lab API", version="1.0.0")
+app.add_middleware(CORSMiddleware, allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://[a-z0-9-]+\.onrender\.com", allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
+
+class TrainRequest(BaseModel):
+    rows: list[dict[str, Any]] = Field(min_length=15, max_length=15000)
+    features: list[str] = Field(min_length=1, max_length=25)
+    target: str
+    task: Literal["classification", "regression"] = "classification"
+    n_estimators: int = Field(default=60, ge=1, le=300)
+    learning_rate: float = Field(default=0.8, gt=0, le=5)
+    max_depth: int = Field(default=1, ge=1, le=8)
+    min_samples_leaf: int = Field(default=1, ge=1, le=100)
+    loss: Literal["linear", "square", "exponential"] = "linear"
+    test_size: float = Field(default=0.25, ge=0.1, le=0.45)
+    random_state: int = Field(default=42, ge=0, le=100000)
+    compare_baseline: bool = True
+    plot_features: list[str] | None = None
+
+
+def json_safe(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(k): json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return [json_safe(x) for x in value]
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating, float)):
+        return float(value) if math.isfinite(float(value)) else None
+    if isinstance(value, (np.bool_,)):
+        return bool(value)
+    if pd.isna(value):
+        return None
+    return value
+
+
+def preprocess_for(df: pd.DataFrame, features: list[str]) -> tuple[ColumnTransformer, list[str], list[str]]:
+    numeric = [c for c in features if pd.api.types.is_numeric_dtype(df[c])]
+    categorical = [c for c in features if c not in numeric]
+    transformers = []
+    if numeric:
+        transformers.append(("numeric", Pipeline([("imputer", SimpleImputer(strategy="median", keep_empty_features=True)), ("scale", StandardScaler())]), numeric))
+    if categorical:
+        transformers.append(("categorical", Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("encode", OneHotEncoder(handle_unknown="ignore", sparse_output=False, max_categories=20))]), categorical))
+    return ColumnTransformer(transformers, sparse_threshold=0), numeric, categorical
+
+
+def get_dataset(name: str) -> tuple[pd.DataFrame, str, str]:
+    rng = np.random.default_rng(42)
+    if name == "moons":
+        x, y = make_moons(n_samples=280, noise=0.27, random_state=42)
+        df = pd.DataFrame({"feature_x": x[:, 0], "feature_y": x[:, 1], "target": ["class_b" if z else "class_a" for z in y]})
+        return df, "target", "classification"
+    if name == "complex-classification":
+        x, y = make_classification(n_samples=420, n_features=6, n_informative=4, n_redundant=1, n_clusters_per_class=2, class_sep=0.75, flip_y=0.1, random_state=42)
+        df = pd.DataFrame(x, columns=[f"signal_{i+1}" for i in range(6)])
+        df["region"] = rng.choice(["north", "south", "east"], size=len(df))
+        df["target"] = np.where(y, "high", "low")
+        df.loc[rng.choice(len(df), 36, replace=False), "signal_2"] = np.nan
+        return df, "target", "classification"
+    if name == "nonlinear-regression":
+        x = rng.uniform(-3, 3, (360, 2))
+        y = 3 * np.sin(1.8 * x[:, 0]) + 1.8 * x[:, 1] ** 2 + 0.7 * x[:, 0] * x[:, 1] + rng.normal(0, 1.15, 360)
+        df = pd.DataFrame({"feature_x": x[:, 0], "feature_y": x[:, 1], "target": y})
+        return df, "target", "regression"
+    if name == "mixed-regression":
+        x, y = make_friedman1(n_samples=450, n_features=6, noise=2.2, random_state=42)
+        df = pd.DataFrame(x, columns=[f"factor_{i+1}" for i in range(6)])
+        df["segment"] = rng.choice(["starter", "standard", "premium"], len(df))
+        df["target"] = y + df["segment"].map({"starter": -2, "standard": 0, "premium": 3}).to_numpy()
+        df.loc[rng.choice(len(df), 32, replace=False), "factor_1"] = np.nan
+        return df, "target", "regression"
+    raise HTTPException(404, "Unknown dataset")
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "service": "modelmind-adaboost"}
+
+
+@app.get("/api/datasets")
+def datasets():
+    return {"datasets": [
+        {"id": "moons", "name": "Two Moons", "task": "classification", "description": "Curved, noisy decision boundaries"},
+        {"id": "complex-classification", "name": "Mixed Classification", "task": "classification", "description": "Categorical columns, missing values and noise"},
+        {"id": "nonlinear-regression", "name": "Nonlinear Regression", "task": "regression", "description": "Sinusoidal and quadratic interactions"},
+        {"id": "mixed-regression", "name": "Mixed Regression", "task": "regression", "description": "Mixed categories, noisy targets and missing entries"},
+    ]}
+
+
+@app.get("/api/datasets/{name}")
+def dataset(name: str):
+    df, target, task = get_dataset(name)
+    return json_safe({"name": name, "rows": df.replace({np.nan: None}).to_dict(orient="records"), "columns": list(df.columns), "target": target, "features": [c for c in df if c != target], "task": task})
+
+
+def scores(y_true, y_pred, task, positive_label=None, proba=None):
+    if task == "classification":
+        out = {"accuracy": accuracy_score(y_true, y_pred), "precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0), "recall_macro": recall_score(y_true, y_pred, average="macro", zero_division=0), "f1_macro": f1_score(y_true, y_pred, average="macro", zero_division=0)}
+        if proba is not None and len(np.unique(y_true)) == 2:
+            try:
+                out["roc_auc"] = roc_auc_score((np.asarray(y_true) == positive_label).astype(int), proba)
+            except ValueError:
+                pass
+        return json_safe(out)
+    return json_safe({"mae": mean_absolute_error(y_true, y_pred), "mse": mean_squared_error(y_true, y_pred), "rmse": np.sqrt(mean_squared_error(y_true, y_pred)), "r2": r2_score(y_true, y_pred)})
+
+
+@app.post("/api/train")
+def train(req: TrainRequest):
+    if len(set(req.features)) != len(req.features) or req.target in req.features:
+        raise HTTPException(422, "Features must be unique and must not contain the target")
+    raw = pd.DataFrame(req.rows)
+    missing_cols = [c for c in [*req.features, req.target] if c not in raw.columns]
+    if missing_cols:
+        raise HTTPException(422, f"Unknown columns: {missing_cols}")
+    data = raw[[*req.features, req.target]].copy()
+    for col in req.features:
+        converted = pd.to_numeric(data[col], errors="coerce")
+        valid_numeric = data[col].notna().sum()
+        if valid_numeric and converted.notna().sum() / valid_numeric >= 0.95:
+            data[col] = converted
+        else:
+            data[col] = data[col].map(lambda v: str(v) if pd.notna(v) and str(v).strip() else np.nan)
+    if req.task == "regression":
+        data[req.target] = pd.to_numeric(data[req.target], errors="coerce")
+    else:
+        data[req.target] = data[req.target].map(lambda v: str(v) if pd.notna(v) and str(v).strip() else np.nan)
+    data = data.dropna(subset=[req.target]).reset_index(drop=True)
+    if len(data) < 15:
+        raise HTTPException(422, "At least 15 rows must have a valid target")
+    y = data[req.target]
+    if req.task == "classification":
+        vc = y.value_counts()
+        if len(vc) < 2 or len(vc) > 12:
+            raise HTTPException(422, "Classification requires 2–12 target classes")
+        if vc.min() < 3:
+            raise HTTPException(422, "Each class requires at least 3 samples")
+    elif y.nunique() < 3:
+        raise HTTPException(422, "Regression target needs at least 3 distinct values")
+    preprocessor, numerical, categorical = preprocess_for(data, req.features)
+    requested_axes = req.plot_features or numerical[:2]
+    if len(requested_axes) == 2 and (requested_axes[0] == requested_axes[1] or any(c not in numerical for c in requested_axes)):
+        raise HTTPException(422, "Plot axes must be two distinct numeric selected features")
+    indexes = np.arange(len(data))
+    try:
+        tr, te = train_test_split(indexes, test_size=req.test_size, random_state=req.random_state, stratify=y if req.task == "classification" else None)
+    except ValueError as exc:
+        raise HTTPException(422, f"Invalid train/test split: {exc}") from exc
+    X_train, X_test = data.loc[tr, req.features], data.loc[te, req.features]
+    y_train, y_test = y.iloc[tr], y.iloc[te]
+    tree_params = {"max_depth": req.max_depth, "min_samples_leaf": req.min_samples_leaf, "random_state": req.random_state}
+    base = DecisionTreeClassifier(**tree_params) if req.task == "classification" else DecisionTreeRegressor(**tree_params)
+    model = (AdaBoostClassifier(estimator=base, n_estimators=req.n_estimators, learning_rate=req.learning_rate, random_state=req.random_state)
+             if req.task == "classification" else AdaBoostRegressor(estimator=base, n_estimators=req.n_estimators, learning_rate=req.learning_rate, loss=req.loss, random_state=req.random_state))
+    pipe = Pipeline([("preprocess", preprocessor), ("model", model)])
+    try:
+        pipe.fit(X_train, y_train)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(422, f"Training error: {exc}") from exc
+    fitted = pipe.named_steps["model"]
+    classes = list(fitted.classes_) if req.task == "classification" else []
+    pos = classes[1] if len(classes) == 2 else None
+    yt = y_test.to_numpy()
+    yp = pipe.predict(X_test)
+    probability = pipe.predict_proba(X_test)[:, 1] if pos is not None else None
+    train_scores = scores(y_train, pipe.predict(X_train), req.task)
+    test_scores = scores(yt, yp, req.task, pos, probability)
+    stages = []
+    for i, (p_tr, p_te) in enumerate(zip(fitted.staged_predict(pipe.named_steps["preprocess"].transform(X_train)), fitted.staged_predict(pipe.named_steps["preprocess"].transform(X_test)))):
+        row = {"round": i + 1, "train": scores(y_train, p_tr, req.task), "test": scores(yt, p_te, req.task), "weight": float(fitted.estimator_weights_[i]), "error": float(fitted.estimator_errors_[i])}
+        stages.append(row)
+    importance_names = pipe.named_steps["preprocess"].get_feature_names_out().tolist()
+    importance = getattr(fitted, "feature_importances_", np.zeros(len(importance_names)))
+    features_importance = sorted(({"feature": str(n).replace("numeric__", "").replace("categorical__", ""), "value": float(v)} for n, v in zip(importance_names, importance)), key=lambda r: r["value"], reverse=True)[:15]
+    preview = []
+    for idx in range(min(len(te), 130)):
+        ix = te[idx]
+        preview.append({"index": int(ix), "actual": json_safe(yt[idx]), "predicted": json_safe(yp[idx]), "correct": bool(yp[idx] == yt[idx]) if req.task == "classification" else None})
+    baseline_metrics = None
+    if req.compare_baseline:
+        baseline_model = DecisionTreeClassifier(**tree_params) if req.task == "classification" else DecisionTreeRegressor(**tree_params)
+        baseline = Pipeline([("preprocess", preprocess_for(data, req.features)[0]), ("model", baseline_model)])
+        baseline.fit(X_train, y_train)
+        baseline_metrics = scores(y_test, baseline.predict(X_test), req.task)
+    surface = None
+    if len(requested_axes) == 2:
+        xs = X_train[requested_axes[0]].dropna().to_numpy(dtype=float)
+        ys = X_train[requested_axes[1]].dropna().to_numpy(dtype=float)
+        if len(xs) and len(ys):
+            x0, x1 = np.percentile(xs, [2, 98]); y0, y1 = np.percentile(ys, [2, 98])
+            xp = max((x1-x0)*.1, .01); ypadd = max((y1-y0)*.1, .01)
+            xx = np.linspace(x0-xp, x1+xp, 31); yy = np.linspace(y0-ypadd, y1+ypadd, 31)
+            gx, gy = np.meshgrid(xx, yy)
+            anchor = {}
+            for name in req.features:
+                col = X_train[name].dropna()
+                anchor[name] = (float(col.median()) if name in numerical else str(col.mode().iloc[0])) if len(col) else (0.0 if name in numerical else "missing")
+            grid = pd.DataFrame([anchor] * len(gx.ravel()))
+            grid[requested_axes[0]] = gx.ravel()
+            grid[requested_axes[1]] = gy.ravel()
+            transformed = pipe.named_steps["preprocess"].transform(grid)
+            z = (fitted.predict_proba(transformed)[:, 1] if len(classes) == 2 else fitted.predict(transformed)) if req.task == "classification" else fitted.predict(transformed)
+            sample_points = [{"x": float(a), "y": float(b), "label": json_safe(c)} for a, b, c in zip(data[requested_axes[0]], data[requested_axes[1]], data[req.target]) if pd.notna(a) and pd.notna(b)][:400]
+            surface = {"x": xx.tolist(), "y": yy.tolist(), "z": z.reshape(31, 31).tolist(), "points": sample_points, "mode": "probability" if len(classes) == 2 else "prediction", "feature_x": requested_axes[0], "feature_y": requested_axes[1], "fixed_features": {k: json_safe(v) for k, v in anchor.items() if k not in requested_axes}}
+    confusion = confusion_matrix(y_test, pipe.predict(X_test), labels=classes).tolist() if req.task == "classification" else None
+    return json_safe({"task": req.task, "target": req.target, "features": req.features, "rows": {"total": len(raw), "usable": len(data), "train": len(tr), "test": len(te)}, "classes": classes, "metrics": {"train": train_scores, "test": test_scores, "baseline": baseline_metrics}, "stages": stages, "actual_estimators": len(fitted.estimators_), "importance": features_importance, "predictions": preview, "confusion_matrix": confusion, "surface": surface, "preprocessing": {"numeric": numerical, "categorical": categorical, "missing_cells": int(data[req.features].isna().sum().sum()), "dropped_target_rows": int(len(raw)-len(data)), "numeric_missing": {c:int(data[c].isna().sum()) for c in numerical}, "categorical_missing": {c:int(data[c].isna().sum()) for c in categorical}}, "hyperparameters": req.model_dump(exclude={"rows"})})

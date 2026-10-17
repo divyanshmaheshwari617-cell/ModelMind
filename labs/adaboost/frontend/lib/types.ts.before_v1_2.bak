@@ -1,0 +1,13 @@
+export type Task = "classification" | "regression";
+export type DataRow = Record<string, string | number | null>;
+export type DataSet = {name:string;rows:DataRow[];columns:string[];target:string;features:string[];task:Task};
+export type MetricSet = Record<string,number|null>;
+export type Stage = {round:number;train:MetricSet;test:MetricSet;weight:number;error:number};
+export type TrainResult = {
+ task:Task; target:string; features:string[]; rows:{total:number;usable:number;train:number;test:number}; classes:string[];
+ metrics:{train:MetricSet;test:MetricSet;baseline:MetricSet|null};stages:Stage[];actual_estimators:number;
+ importance:{feature:string;value:number}[];predictions:{index:number;actual:string|number;predicted:string|number;correct:boolean|null}[];
+ confusion_matrix:number[][]|null; surface:{x:number[];y:number[];z:number[][];points:{x:number;y:number;label:string|number}[];mode:string;feature_x:string;feature_y:string;fixed_features:Record<string,string|number>}|null;
+ preprocessing:{numeric:string[];categorical:string[];missing_cells:number;dropped_target_rows:number;numeric_missing:Record<string,number>;categorical_missing:Record<string,number>};hyperparameters:Record<string,unknown>;
+};
+export type TrainConfig = {rows:DataRow[];features:string[];target:string;task:Task;n_estimators:number;learning_rate:number;max_depth:number;min_samples_leaf:number;loss:"linear"|"square"|"exponential";test_size:number;random_state:number;compare_baseline:boolean;plot_features?:string[]};
