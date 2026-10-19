@@ -49,7 +49,7 @@ export const mlLabs: MLLab[] = [
     category: "Regression",
     description:
       "Explore nonlinear regression, polynomial degree, curve fitting, underfitting and overfitting.",
-    url: "https://modelmind-polynomial-lab.onrender.com",
+    url: "https://modelmind-polynomial-lab-2026.onrender.com/",
     skillIds: ["polynomial-regression"],
   },
   {
@@ -89,7 +89,7 @@ export const mlLabs: MLLab[] = [
   category: "Classification",
   description:
     "Explore decision tree splitting, entropy, Gini impurity, information gain, and tree-based predictions.",
-  url: "https://diciation-tree-visualization.onrender.com/",
+  url: "https://decision-tree-studio.onrender.com/",
   skillIds: ["decision-tree"],
 },
   {
@@ -129,7 +129,7 @@ export const mlLabs: MLLab[] = [
     category: "Ensembles",
     description:
       "Compare individual machine learning models with ensemble methods using interactive visualizations and evaluation metrics.",
-    url: "https://modelmind-ensemble-web.onrender.com",
+    url: "https://modelmind-ensemble-lab-2026.onrender.com/",
     skillIds: ["ensemble-learning"],
   },
   {
@@ -138,7 +138,7 @@ export const mlLabs: MLLab[] = [
     category: "Ensembles",
     description:
       "Explore bootstrap sampling, parallel estimators, variance reduction and bagging-based predictions.",
-    url: "https://modelmind-bagging-web.onrender.com",
+    url: "https://modelmind-bagging-studio-2026.onrender.com/",
     skillIds: ["bagging"],
   },
   {
@@ -147,7 +147,7 @@ export const mlLabs: MLLab[] = [
     category: "Ensembles",
     description:
       "Understand how multiple decision trees combine predictions.",
-    url: "https://random-forest-t8mf.onrender.com",
+    url: "https://random-forest-explorer.onrender.com/",
     skillIds: ["random-forest"],
   },
   {
@@ -197,7 +197,7 @@ export const mlLabs: MLLab[] = [
     category: "Ensembles",
     description:
       "Explore efficient gradient boosting with decision trees.",
-    url: "https://lightgbm-viz.onrender.com",
+    url: "https://lightgbm-viz.onrender.com/",
     skillIds: ["lightgbm"],
   },
   {
@@ -206,7 +206,7 @@ export const mlLabs: MLLab[] = [
     category: "Ensembles",
     description:
       "Explore hard voting, soft voting, stacking ensembles and meta-model predictions.",
-    url: "https://modelmind-voting-stacking.onrender.com",
+    url: "https://modelmind-voting-stacking.onrender.com/",
     skillIds: ["voting-stacking", "voting", "stacking"],
   },
 
@@ -278,7 +278,7 @@ export const mlLabs: MLLab[] = [
     category: "Optimization",
     description:
       "Explore learning rates, optimization paths and convergence.",
-    url: "https://modelmind-gradient-descent-tlhj.onrender.com",
+    url: "https://modelmind-gradient-descent-static-2026.onrender.com/",
     skillIds: ["gradient-descent"],
   },
 ];
