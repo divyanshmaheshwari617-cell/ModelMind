@@ -13,60 +13,84 @@ const VIDEOGPT_URL = "https://video-analysis-amber-pi.vercel.app/";
 
 const roadmaps = [
   {
-    name: "Data Science",
-    description: "From basics to advanced ML pipelines.",
+    name: "College & Exams",
+    description:
+      "Master ML fundamentals, practical coding and the concepts commonly required in coursework and examinations.",
     count: "50+ topics",
-    icon: "▥",
-    color: "orange",
+    icon: "◫",
+    color: "blue",
   },
   {
-    name: "Machine Learning",
-    description: "Learn core ML algorithms with hands-on practice.",
+    name: "ML Engineer",
+    description:
+      "Build practical skills in preprocessing, modeling, evaluation, pipelines and end-to-end ML workflows.",
     count: "60+ topics",
     icon: "♧",
     color: "purple",
   },
   {
-    name: "Deep Learning",
-    description: "Neural networks, CNNs, RNNs and more.",
+    name: "Data Scientist",
+    description:
+      "Develop statistics, EDA, feature engineering, machine learning and data-driven problem-solving skills.",
+    count: "55+ topics",
+    icon: "▥",
+    color: "orange",
+  },
+  {
+    name: "Data Analyst",
+    description:
+      "Focus on Python, NumPy, Pandas, cleaning, EDA, visualization and statistical analysis.",
     count: "45+ topics",
-    icon: "✣",
+    icon: "▤",
     color: "blue",
   },
   {
-    name: "Generative AI",
-    description: "LLMs, prompt engineering and real-world projects.",
-    count: "35+ topics",
+    name: "AI Engineer",
+    description:
+      "Build strong machine-learning foundations before progressing into broader AI systems.",
+    count: "50+ topics",
     icon: "✦",
     color: "yellow",
   },
   {
-    name: "Full Stack Development",
-    description: "Build modern web apps from scratch.",
-    count: "40+ topics",
-    icon: "▱",
+    name: "Deep Learning",
+    description:
+      "Build the Python, mathematics and ML foundations required before studying neural networks deeply.",
+    count: "45+ topics",
+    icon: "✣",
     color: "green",
   },
   {
-    name: "Cyber Security",
-    description: "Learn security concepts and practical tools.",
-    count: "30+ topics",
+    name: "Placement Preparation",
+    description:
+      "Strengthen ML theory, implementation, interview concepts, evaluation and project confidence.",
+    count: "65+ topics",
+    icon: "▱",
+    color: "pink",
+  },
+  {
+    name: "Hackathon",
+    description:
+      "Prioritize practical preprocessing, model building, evaluation and rapid end-to-end experimentation.",
+    count: "40+ topics",
+    icon: "⚡",
+    color: "orange",
+  },
+  {
+    name: "Build Projects",
+    description:
+      "Learn concepts through practical workflows and progressively more complete machine-learning projects.",
+    count: "50+ topics",
     icon: "⬡",
     color: "lime",
   },
   {
-    name: "Cloud Computing",
-    description: "AWS, deployment and cloud fundamentals.",
-    count: "35+ topics",
-    icon: "☁",
-    color: "blue",
-  },
-  {
-    name: "Interview Preparation",
-    description: "Company-wise questions and practice sets.",
-    count: "100+ questions",
-    icon: "▤",
-    color: "pink",
+    name: "Custom Goal",
+    description:
+      "Describe your own objective and let ModelMind personalize the learning path around it.",
+    count: "Personalized",
+    icon: "◎",
+    color: "purple",
   },
 ];
 
@@ -454,7 +478,7 @@ function DashboardHome({
       <section className="homeMetricGrid" aria-label="Your learning workspace">
         <button type="button" onClick={() => onWorkspaceChange("Roadmap")}>
           <span className="homeMetricIcon metricPurple">♧</span>
-          <span><strong>Learning paths</strong><b>8</b><small>Guided roadmaps to explore</small></span>
+          <span><strong>Learning paths</strong><b>{roadmaps.length}</b><small>Guided roadmaps to explore</small></span>
           <span className="metricArrow">›</span>
         </button>
         <button type="button" onClick={() => onWorkspaceChange("Notebook")}>
