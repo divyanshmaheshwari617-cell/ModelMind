@@ -4,7 +4,9 @@ import { useState } from "react";
 
 import ProjectsWorkspace from "@/components/projects/ProjectsWorkspace";
 import OpenJupyterForm from "@/components/notebook/OpenJupyterForm";
+import EmbeddedLabViewer from "@/components/visualization/EmbeddedLabViewer";
 import { visualizations } from "@/lib/visualizations";
+import type { VisualizationItem } from "@/lib/visualizations";
 import type { Workspace } from "./Sidebar";
 
 const ROADMAP_URL =
@@ -283,6 +285,7 @@ export default function PortalSections({
   onWorkspaceChange,
   userEmail,
 }: PortalSectionsProps) {
+  const [activeLab, setActiveLab] = useState<VisualizationItem | null>(null);
   if (section === "Roadmap") {
     return (
       <main className="referencePage">
@@ -355,11 +358,17 @@ export default function PortalSections({
           <div className="referenceVisualizationGrid">
             {visualizations.slice(0, 7).map((item) =>
               item.href ? (
-                <ExternalLink className="referenceVisualizationCard" href={item.href} key={item.name}>
+                <button
+                  type="button"
+                  className="referenceVisualizationCard"
+                  key={item.name}
+                  onClick={() => setActiveLab(item)}
+                  style={{ textAlign: "left", cursor: "pointer", border: "none", font: "inherit", padding: 0, background: "transparent" }}
+                >
                   <strong>{item.name}</strong>
                   <VisualizationIllustration kind={item.kind} />
                   <i aria-hidden="true"><ArrowIcon /></i>
-                </ExternalLink>
+                </button>
               ) : (
                 <div
                   aria-disabled="true"
@@ -374,6 +383,7 @@ export default function PortalSections({
             )}
           </div>
         </section>
+        <EmbeddedLabViewer lab={activeLab} onClose={() => setActiveLab(null)} />
       </main>
     );
   }
