@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/run-local.mjs dev",
+    "dev": "next dev",
+    "dev:full": "node scripts/run-local.mjs dev",
     "companion": "node scripts/run-local.mjs companion",
     "build": "next build --webpack",
     "start": "next start",

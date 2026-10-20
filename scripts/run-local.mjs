@@ -46,15 +46,8 @@ async function isJupyterRunning() {
     }
 
     return response.status === 401;
-  } catch (error) {
-    if (
-      error instanceof TypeError &&
-      (error.cause?.code === "ECONNREFUSED" ||
-        error.cause?.code === "ECONNRESET")
-    ) {
-      return false;
-    }
-    throw error;
+  } catch {
+    return false;
   }
 }
 
@@ -69,15 +62,8 @@ async function isBackendRunning() {
 
     const body = await response.json();
     return body?.status === "healthy";
-  } catch (error) {
-    if (
-      error instanceof TypeError &&
-      (error.cause?.code === "ECONNREFUSED" ||
-        error.cause?.code === "ECONNRESET")
-    ) {
-      return false;
-    }
-    throw error;
+  } catch {
+    return false;
   }
 }
 
@@ -174,68 +160,95 @@ try {
   } else if (await isJupyterRunning()) {
     console.log(`Using the existing Jupyter server at ${jupyterUrl}.`);
   } else {
-    console.log(`Starting JupyterLab at ${jupyterUrl}.`);
-    if (process.platform === "win32") {
-      startChild(
-        "powershell.exe",
-        [
-          "-NoProfile",
-          "-ExecutionPolicy",
-          "Bypass",
-          "-File",
-          platformScript,
-          "-Port",
-          String(jupyterPort),
-        ],
-        {
-          cwd: repositoryDirectory,
-          env: {
-            ...process.env,
-            MODELMIND_JUPYTER_PORT: String(jupyterPort),
-          },
-        },
-      );
-    } else {
-      startChild("bash", [platformScript], {
-        cwd: repositoryDirectory,
-        env: {
-          ...process.env,
-          MODELMIND_JUPYTER_PORT: String(jupyterPort),
-          PORT: String(jupyterPort),
-        },
-      });
+    let canStartPlatform = false;
+    try {
+      await access(platformScript);
+      canStartPlatform = true;
+    } catch {
+      console.log("Local platform script not found; skipping local JupyterLab.");
     }
-    await waitForService("JupyterLab", isJupyterRunning, 10 * 60 * 1000);
+
+    if (canStartPlatform) {
+      console.log(`Starting JupyterLab at ${jupyterUrl}.`);
+      try {
+        if (process.platform === "win32") {
+          startChild(
+            "powershell.exe",
+            [
+              "-NoProfile",
+              "-ExecutionPolicy",
+              "Bypass",
+              "-File",
+              platformScript,
+              "-Port",
+              String(jupyterPort),
+            ],
+            {
+              cwd: repositoryDirectory,
+              env: {
+                ...process.env,
+                MODELMIND_JUPYTER_PORT: String(jupyterPort),
+              },
+            },
+          );
+        } else {
+          startChild("bash", [platformScript], {
+            cwd: repositoryDirectory,
+            env: {
+              ...process.env,
+              MODELMIND_JUPYTER_PORT: String(jupyterPort),
+              PORT: String(jupyterPort),
+            },
+          });
+        }
+        await waitForService("JupyterLab", isJupyterRunning, 30 * 1000);
+      } catch (err) {
+        console.warn("Could not start JupyterLab (continuing with web app):", err?.message ?? err);
+      }
+    }
   }
 
   if (await isBackendRunning()) {
     console.log(`Using the existing local ModelMind API at ${apiUrl}.`);
   } else {
-    await access(pythonExecutable);
-    const localOrigins = await readLocalOriginSetting();
-    console.log(`Starting the local ModelMind API at ${apiUrl}.`);
-    startChild(
-      pythonExecutable,
-      [
-        "-m",
-        "uvicorn",
-        "main:app",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        String(apiPort),
-      ],
-      {
-        cwd: backendDirectory,
-        env: {
-          ...process.env,
-          ...(localOrigins ? { MODELMIND_WEB_ORIGINS: localOrigins } : {}),
-          MODELMIND_API_PORT: String(apiPort),
-          MODELMIND_JUPYTER_PORT: String(jupyterPort),
-        },
-      },
-    );
-    await waitForService("ModelMind API", isBackendRunning, 60 * 1000);
+    let canStartPython = false;
+    try {
+      await access(pythonExecutable);
+      canStartPython = true;
+    } catch {
+      console.log("Python virtual environment not found; skipping local ModelMind Python API.");
+    }
+
+    if (canStartPython) {
+      try {
+        const localOrigins = await readLocalOriginSetting();
+        console.log(`Starting the local ModelMind API at ${apiUrl}.`);
+        startChild(
+          pythonExecutable,
+          [
+            "-m",
+            "uvicorn",
+            "main:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            String(apiPort),
+          ],
+          {
+            cwd: backendDirectory,
+            env: {
+              ...process.env,
+              ...(localOrigins ? { MODELMIND_WEB_ORIGINS: localOrigins } : {}),
+              MODELMIND_API_PORT: String(apiPort),
+              MODELMIND_JUPYTER_PORT: String(jupyterPort),
+            },
+          },
+        );
+        await waitForService("ModelMind API", isBackendRunning, 30 * 1000);
+      } catch (err) {
+        console.warn("Could not start ModelMind Python API (continuing with web app):", err?.message ?? err);
+      }
+    }
   }
 
   if (runWebsite) {
