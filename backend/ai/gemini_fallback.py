@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 
 MODEL_NAME = "gemini-3.8-flash"
 
-
 class GeminiDebugOutput(BaseModel):
     title: str = Field(
         description=(

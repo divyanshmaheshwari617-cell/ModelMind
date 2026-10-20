@@ -3,12 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/run-local.mjs dev",
+    "companion": "node scripts/run-local.mjs companion",
+    "build": "next build --webpack",
     "start": "next start",
+    "start:local": "node scripts/run-local.mjs start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "lucide-react": "^1.55.0",
+    "mongodb": "^7.7.0",
     "next": "16.3.6",
     "papaparse": "^5.7.0",
     "plotly.js-dist-min": "^4.1.1",
