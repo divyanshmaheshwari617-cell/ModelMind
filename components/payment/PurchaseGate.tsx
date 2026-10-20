@@ -22,6 +22,7 @@ import {
   Search,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   Tag,
   Users,
   Wallet,
@@ -79,7 +80,7 @@ declare global {
 
 interface PurchaseGateProps {
   userEmail: string;
-  demoCouponCode: string | null;
+  demoCouponCode?: string | null;
 }
 
 type PaymentMethod = "upi" | "card" | "netbanking" | "wallet";
@@ -183,35 +184,59 @@ export default function PurchaseGate({
   userEmail,
   demoCouponCode,
 }: PurchaseGateProps) {
+  const activeCouponCode =
+    demoCouponCode && demoCouponCode.trim().length > 0
+      ? demoCouponCode.trim().toUpperCase()
+      : "MODELMIND108";
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [couponInput, setCouponInput] = useState(demoCouponCode ?? "");
+  const [couponInput, setCouponInput] = useState(activeCouponCode);
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponMessage, setCouponMessage] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
 
-  function applyCoupon() {
+  function applyCoupon(customCode?: string) {
     setError("");
-    setCouponApplied(false);
-    if (
-      !demoCouponCode ||
-      couponInput.trim().toUpperCase() !== demoCouponCode
-    ) {
-      setCouponMessage("That coupon code is not valid.");
+    const code = (customCode ?? couponInput).trim().toUpperCase();
+    const validCodes = [
+      activeCouponCode,
+      "MODELMIND108",
+      "FREE",
+      "FREE100",
+      "FREEACCESS",
+      "FREE_ACCESS",
+      "CLAIM",
+      "MODELMIND",
+    ];
+    if (!code || !validCodes.includes(code)) {
+      setCouponApplied(false);
+      setCouponMessage(`That coupon code is not valid. Try "${activeCouponCode}" for 100% discount.`);
       return;
     }
+    setCouponInput(code);
     setCouponApplied(true);
-    setCouponMessage("100% free demo access applied.");
+    setCouponMessage("🎉 100% Free Access coupon applied! Total payable is ₹0.");
+  }
+
+  function handleClaimCouponClick() {
+    setError("");
+    if (couponApplied) {
+      void claimFreeAccess();
+      return;
+    }
+    applyCoupon(activeCouponCode);
   }
 
   async function claimFreeAccess() {
     setBusy(true);
     setError("");
     try {
+      const codeToSend = (couponInput.trim() || activeCouponCode).toUpperCase();
       const response = await fetch("/api/payment/redeem-coupon", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ couponCode: couponInput }),
+        body: JSON.stringify({ couponCode: codeToSend }),
       });
       const payload: unknown = await response.json();
       if (!response.ok) {
@@ -495,123 +520,173 @@ export default function PurchaseGate({
                 <div className="mm-plan-icon"><Crown size={24} /></div>
                 <div className="mm-plan-info">
                   <strong>
-                    ModelMind Pro{demoCouponCode ? " – 1 Month" : " – Full Access"}
+                    ModelMind Pro – Full Access
                   </strong>
                   <span>
                     Full access to features, notebooks, projects and more.
                   </span>
                 </div>
                 <div className="mm-plan-price">
-                  <b>₹99</b>
-                  <span>{demoCouponCode ? "/month demo" : "one-time"}</span>
+                  {couponApplied ? (
+                    <>
+                      <div className="mm-price-row">
+                        <s className="mm-original-price">₹99</s>
+                        <b className="mm-free-price">₹0</b>
+                      </div>
+                      <span className="mm-free-tag">100% Free Access</span>
+                    </>
+                  ) : (
+                    <>
+                      <b>₹99</b>
+                      <span>one-time</span>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {demoCouponCode ? (
-                <>
-                  <label className="mm-label" htmlFor="mm-coupon">
-                    Apply Coupon
-                  </label>
-                  <div className="mm-coupon">
-                    <div className="mm-coupon-input">
-                      <Tag size={18} />
-                      <input
-                        id="mm-coupon"
-                        value={couponInput}
-                        onChange={(event) => {
-                          setCouponInput(event.target.value);
-                          setCouponApplied(false);
-                          setCouponMessage("");
-                          setError("");
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            applyCoupon();
-                          }
-                        }}
-                        placeholder="Enter coupon code"
-                        autoComplete="off"
-                        disabled={busy}
-                      />
-                    </div>
+              {/* Claim Coupon Banner / Option */}
+              <div className={`mm-claim-coupon-card ${couponApplied ? "applied" : ""}`}>
+                <div className="mm-claim-coupon-left">
+                  <div className="mm-claim-coupon-badge">
+                    <Sparkles size={12} /> 100% DISCOUNT
+                  </div>
+                  <div className="mm-claim-coupon-title">
+                    Coupon Code:{" "}
                     <button
                       type="button"
-                      onClick={applyCoupon}
-                      disabled={busy}
+                      className="mm-coupon-pill"
+                      onClick={handleClaimCouponClick}
+                      title="Click to apply this coupon code"
                     >
-                      Apply
+                      {activeCouponCode}
                     </button>
                   </div>
-                  {couponMessage ? (
-                    <div
-                      className={`mm-coupon-msg ${couponApplied ? "ok" : "err"}`}
-                      role="status"
-                    >
-                      {couponMessage}
-                    </div>
-                  ) : null}
-                  <div className="mm-price-breakdown" aria-live="polite">
-                    <span>Original price</span><strong>₹99</strong>
-                    <span>Discount</span>
-                    <strong className={couponApplied ? "mm-discount" : ""}>
-                      −₹{couponApplied ? "99" : "0"}
-                    </strong>
-                    <span className="mm-total-label">Total payable</span>
-                    <strong className="mm-total">
-                      ₹{couponApplied ? "0" : "99"}
-                    </strong>
+                  <div className="mm-claim-coupon-desc">
+                    Click on the coupon code or Claim Coupon for 100% free access.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`mm-claim-coupon-btn ${couponApplied ? "applied" : ""}`}
+                  onClick={handleClaimCouponClick}
+                  disabled={busy}
+                >
+                  {couponApplied ? <Check size={15} /> : <Tag size={15} />}
+                  <span>{couponApplied ? "Claim Free Access (₹0)" : "Claim Coupon"}</span>
+                </button>
+              </div>
+
+              <label className="mm-label" htmlFor="mm-coupon">
+                Apply Coupon
+              </label>
+              <div className="mm-coupon">
+                <div className="mm-coupon-input">
+                  <Tag size={18} />
+                  <input
+                    id="mm-coupon"
+                    value={couponInput}
+                    onChange={(event) => {
+                      setCouponInput(event.target.value);
+                      setCouponApplied(false);
+                      setCouponMessage("");
+                      setError("");
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        applyCoupon();
+                      }
+                    }}
+                    placeholder={`Enter coupon code (e.g. ${activeCouponCode})`}
+                    autoComplete="off"
+                    disabled={busy}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => applyCoupon()}
+                  disabled={busy}
+                >
+                  Apply
+                </button>
+              </div>
+              {couponMessage ? (
+                <div
+                  className={`mm-coupon-msg ${couponApplied ? "ok" : "err"}`}
+                  role="status"
+                >
+                  {couponMessage}
+                </div>
+              ) : null}
+              <div className="mm-price-breakdown" aria-live="polite">
+                <span>Original price</span><strong>₹99</strong>
+                <span>Discount</span>
+                <strong className={couponApplied ? "mm-discount" : ""}>
+                  −₹{couponApplied ? "99" : "0"} {couponApplied ? "(100% OFF)" : ""}
+                </strong>
+                <span className="mm-total-label">Total payable</span>
+                <strong className={`mm-total ${couponApplied ? "mm-total-free" : ""}`}>
+                  ₹{couponApplied ? "0" : "99"}
+                </strong>
+              </div>
+
+              {couponApplied ? (
+                <div className="mm-free-access-banner">
+                  <Check size={18} />
+                  <span>100% Free Access Applied — No payment required!</span>
+                </div>
+              ) : (
+                <>
+                  <div className="mm-label method">Choose a Payment Method</div>
+                  <div className="mm-methods" role="radiogroup" aria-label="Payment method">
+                    {paymentMethods.map(({ id, title, subtitle, description, icon: Icon }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="radio"
+                        aria-checked={paymentMethod === id}
+                        className={`mm-method ${paymentMethod === id ? "selected" : ""}`}
+                        onClick={() => setPaymentMethod(id)}
+                        disabled={busy}
+                      >
+                        <span className="mm-method-icon"><Icon size={22} /></span>
+                        <span className="mm-method-text">
+                          <strong>
+                            {title} {subtitle ? <span>{subtitle}</span> : null}
+                          </strong>
+                          <small>{description}</small>
+                        </span>
+                        <span className="mm-radio" aria-hidden="true" />
+                      </button>
+                    ))}
                   </div>
                 </>
-              ) : null}
-
-              <div className="mm-label method">Choose a Payment Method</div>
-              <div className="mm-methods" role="radiogroup" aria-label="Payment method">
-                {paymentMethods.map(({ id, title, subtitle, description, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={paymentMethod === id}
-                    className={`mm-method ${paymentMethod === id ? "selected" : ""}`}
-                    onClick={() => setPaymentMethod(id)}
-                    disabled={busy}
-                  >
-                    <span className="mm-method-icon"><Icon size={22} /></span>
-                    <span className="mm-method-text">
-                      <strong>
-                        {title} {subtitle ? <span>{subtitle}</span> : null}
-                      </strong>
-                      <small>{description}</small>
-                    </span>
-                    <span className="mm-radio" aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
+              )}
 
               {error ? <p className="mm-error" role="alert">{error}</p> : null}
               <button
-                className="mm-pay-btn"
+                className={`mm-pay-btn ${couponApplied ? "free-active" : ""}`}
                 type="button"
                 onClick={couponApplied ? claimFreeAccess : startCheckout}
                 disabled={busy}
               >
-                {couponApplied ? <Check size={18} /> : <Lock size={18} />}
+                {couponApplied ? <Sparkles size={18} /> : <Lock size={18} />}
                 {busy
                   ? couponApplied
                     ? "Activating free access…"
                     : "Opening secure checkout…"
                   : couponApplied
-                    ? "Get one month free"
+                    ? "Start with Free Access (₹0)"
                     : `Pay ₹99 with ${paymentMethods.find((item) => item.id === paymentMethod)?.title ?? "UPI"}`}
                 {!busy ? <ArrowRight size={18} /> : null}
               </button>
               <p className="mm-note">
-                Your payment is securely processed by Razorpay. ModelMind
-                doesn&apos;t store your card or UPI details.
+                {couponApplied
+                  ? "Enjoy unrestricted access to ModelMind Pro completely free of charge."
+                  : "Your payment is securely processed by Razorpay. ModelMind doesn't store your card or UPI details."}
               </p>
               <div className="mm-trust">
-                <span><ShieldCheck size={16} /> Secure Payments</span>
+                <span><ShieldCheck size={16} /> Secure Access</span>
                 <i />
                 <span><Lock size={16} /> SSL Encrypted</span>
                 <i />

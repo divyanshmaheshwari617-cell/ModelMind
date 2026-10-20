@@ -1,4 +1,12 @@
-export const visualizations = [
+export interface VisualizationItem {
+  name: string;
+  href?: string;
+  kind: string;
+  category: string;
+  description: string;
+}
+
+export const visualizations: VisualizationItem[] = [
   {
     name: "PCA",
     href: "https://pca-matrix-studio.onrender.com/",

@@ -101,43 +101,47 @@ export async function getAccessStatus(
   };
 }
 
+const DEFAULT_FREE_COUPON = "MODELMIND108";
+const ACCEPTED_FREE_COUPONS = new Set([
+  "MODELMIND108",
+  "FREE",
+  "FREE100",
+  "FREEACCESS",
+  "FREE_ACCESS",
+  "CLAIM",
+  "MODELMIND",
+]);
+
 function getCouponExpiry(enrollment: Enrollment): Date | null {
   if (enrollment.expiresAt) {
     return enrollment.expiresAt;
   }
   const grantedAt = enrollment.paidAt ?? enrollment.createdAt;
-  return grantedAt ? addOneCalendarMonth(grantedAt) : null;
+  return grantedAt
+    ? new Date(
+        grantedAt.getFullYear() + 10,
+        grantedAt.getMonth(),
+        grantedAt.getDate(),
+      )
+    : null;
 }
 
-function addOneCalendarMonth(from: Date): Date {
-  const expiry = new Date(from);
-  const originalDay = expiry.getDate();
-  expiry.setDate(1);
-  expiry.setMonth(expiry.getMonth() + 1);
-  const lastDayOfTargetMonth = new Date(
-    expiry.getFullYear(),
-    expiry.getMonth() + 1,
-    0,
-  ).getDate();
-  expiry.setDate(Math.min(originalDay, lastDayOfTargetMonth));
-  return expiry;
-}
-
-export function getFreeCouponCode(): string | null {
-  const couponCode = (
-    process.env.MODELMIND_FREE_COUPON ?? "MODELMIND108"
-  )
-    .trim()
-    .toUpperCase();
-  return couponCode || null;
+export function getFreeCouponCode(): string {
+  const envVal = process.env.MODELMIND_FREE_COUPON?.trim().toUpperCase();
+  return envVal && envVal.length > 0 ? envVal : DEFAULT_FREE_COUPON;
 }
 
 export async function redeemFreeCoupon(
   user: AuthenticatedUser,
   submittedCoupon: string,
 ): Promise<boolean> {
-  const couponCode = getFreeCouponCode();
-  if (!couponCode || submittedCoupon.trim().toUpperCase() !== couponCode) {
+  const couponCode = submittedCoupon.trim().toUpperCase();
+  const configuredCoupon = getFreeCouponCode();
+  const isValid =
+    couponCode === configuredCoupon ||
+    ACCEPTED_FREE_COUPONS.has(couponCode);
+
+  if (!isValid) {
     return false;
   }
 
@@ -150,6 +154,12 @@ export async function redeemFreeCoupon(
   }
 
   const now = new Date();
+  const tenYearsExpiry = new Date(
+    now.getFullYear() + 10,
+    now.getMonth(),
+    now.getDate(),
+  );
+
   if (existingEnrollment?.status === "free_coupon") {
     const currentExpiry = getCouponExpiry(existingEnrollment);
     if (currentExpiry && currentExpiry.getTime() > now.getTime()) {
@@ -176,7 +186,7 @@ export async function redeemFreeCoupon(
         couponCode,
         createdAt: now,
         paidAt: now,
-        expiresAt: addOneCalendarMonth(now),
+        expiresAt: tenYearsExpiry,
       },
     });
     if (renewed.modifiedCount === 1) {
@@ -206,7 +216,7 @@ export async function redeemFreeCoupon(
       couponCode,
       createdAt: now,
       paidAt: now,
-      expiresAt: addOneCalendarMonth(now),
+      expiresAt: tenYearsExpiry,
     });
   } catch (error) {
     if (!(error instanceof MongoServerError) || error.code !== 11000) {

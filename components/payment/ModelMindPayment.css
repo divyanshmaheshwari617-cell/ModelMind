@@ -517,6 +517,161 @@
   font-size: 10px;
 }
 
+.mm-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.mm-original-price {
+  color: #928ea8;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: line-through;
+}
+
+.mm-free-price {
+  color: #12a150 !important;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.mm-free-tag {
+  color: #12a150 !important;
+  font-weight: 600;
+}
+
+.mm-claim-coupon-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1.5px dashed #7565ff;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(117, 101, 255, 0.07) 0%, rgba(18, 161, 80, 0.07) 100%);
+  transition: all 0.25s ease;
+}
+
+.mm-claim-coupon-card.applied {
+  border: 1.5px solid #12a150;
+  background: rgba(18, 161, 80, 0.08);
+}
+
+.mm-claim-coupon-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mm-claim-coupon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: #7565ff;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.mm-claim-coupon-card.applied .mm-claim-coupon-badge {
+  background: #12a150;
+}
+
+.mm-claim-coupon-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mm-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mm-coupon-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px dashed #7565ff;
+  border-radius: 6px;
+  background: #fff;
+  color: #7565ff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mm-coupon-pill:hover {
+  background: #7565ff;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.mm-claim-coupon-desc {
+  color: var(--mm-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.mm-claim-coupon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--mm-grad);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mm-claim-coupon-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.mm-claim-coupon-btn.applied {
+  background: #12a150;
+}
+
+.mm-total-free {
+  color: #12a150 !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+}
+
+.mm-free-access-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: rgba(18, 161, 80, 0.1);
+  color: #12a150;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mm-pay-btn.free-active {
+  background: linear-gradient(135deg, #12a150 0%, #0d8340 100%) !important;
+  box-shadow: 0 4px 14px rgba(18, 161, 80, 0.35);
+}
+
 .mm-label {
   display: block;
   margin: 20px 0 10px;
