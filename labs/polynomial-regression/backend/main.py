@@ -44,12 +44,12 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "https://modelmind-polynomial-lab.onrender.com",
         "https://modelmind-polynomial-lab-2026.onrender.com",
+        "https://modelmind-polynomial-frontend-v2.onrender.com",
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
-
 
 # ============================================================
 # REQUEST SCHEMAS
