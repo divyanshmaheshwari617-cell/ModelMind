@@ -49,7 +49,7 @@ export const mlLabs: MLLab[] = [
     category: "Regression",
     description:
       "Explore nonlinear regression, polynomial degree, curve fitting, underfitting and overfitting.",
-    url: "https://modelmind-polynomial-lab-2026.onrender.com/",
+    url: "https://modelmind-polynomial-frontend-v2.onrender.com/",
     skillIds: ["polynomial-regression"],
   },
   {
