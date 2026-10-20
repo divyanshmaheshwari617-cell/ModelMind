@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { mlLabs } from "../../data/mlLabs";
+import ModelMindLabViewer from "../../components/roadmap/ModelMindLabViewer";
 import "./labs.css";
 
 const categories = [
@@ -139,14 +140,12 @@ export default function MLLabsPage() {
                   <p>{lab.description}</p>
                   <span className="ml-labs-interactive">● Interactive lab</span>
 
-                  <a
-                    className="ml-labs-open"
-                    href={lab.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open Lab <span aria-hidden="true">↗</span>
-                  </a>
+                  <ModelMindLabViewer
+  title={lab.title}
+  url={lab.url}
+  label="Open Lab →"
+  className="ml-labs-open"
+/>
 
                   <button
                     className={`ml-labs-complete ${isComplete ? "is-complete" : ""}`}

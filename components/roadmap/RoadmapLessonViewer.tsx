@@ -2155,6 +2155,7 @@ import {
 
 } from "react";
 import { getLabsForSkill } from "../../data/mlLabs";
+import ModelMindLabViewer from "./ModelMindLabViewer";
 
 import RoadmapNativeVisualization from "./visualizations/RoadmapNativeVisualization";
 
@@ -5473,23 +5474,21 @@ const completeAndContinue = () => {
               {lab.description}
             </p>
 
-            <a
-              href={lab.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "inline-block",
-                marginTop: 12,
-                padding: "11px 16px",
-                borderRadius: 10,
-                background: "#4259d5",
-                color: "#ffffff",
-                fontWeight: 700,
-                textDecoration: "none",
-              }}
-            >
-              Open {lab.title} ↗
-            </a>
+            <ModelMindLabViewer
+  title={lab.title}
+  url={lab.url}
+  label={`Open ${lab.title} →`}
+  style={{
+    display: "inline-block",
+    marginTop: 12,
+    padding: "11px 16px",
+    borderRadius: 10,
+    background: "#4259d5",
+    color: "#ffffff",
+    fontWeight: 700,
+    border: "none",
+  }}
+/>
           </div>
         ))}
       </div>
