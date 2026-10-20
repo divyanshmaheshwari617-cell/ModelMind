@@ -6,8 +6,17 @@ import type {
   RegressionPoint,
 } from "./RegressionAnimation";
 
-const Plot = dynamic(
-  () => import("react-plotly.js"),
+const Plot = dynamic<any>(
+  async () => {
+    const [PlotlyModule, createPlotComponentModule] = await Promise.all([
+      import("plotly.js-dist-min"),
+      import("react-plotly.js/factory"),
+    ]);
+    const Plotly = (PlotlyModule as any).default || PlotlyModule;
+    const createPlotComponent =
+      (createPlotComponentModule as any).default || createPlotComponentModule;
+    return createPlotComponent(Plotly);
+  },
   {
     ssr: false,
   }
